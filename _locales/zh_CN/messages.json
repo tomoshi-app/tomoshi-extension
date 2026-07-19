@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Tomoshi 取词"
+  },
+  "extDesc": {
+    "message": "选中日语后按住 Alt 查词，松开关闭（由本地 Tomoshi 桌面应用提供查询）。"
+  }
+}

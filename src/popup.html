@@ -1,0 +1,317 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title data-i18n="popup.title">Tomoshi 查词</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font-family: -apple-system, "Segoe UI", "Noto Sans CJK JP", sans-serif;
+        width: 360px;
+        min-height: 200px;
+        margin: 0;
+        padding: 12px;
+        background: #ffffff;
+        color: #1a1a1a;
+        line-height: 1.5;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .header h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+      .status {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: #eef0f4;
+        color: #333;
+      }
+      .status.ok {
+        background: #e3f3e8;
+        color: #1d7a44;
+      }
+      .status.off {
+        background: #fdecea;
+        color: #b3261e;
+      }
+      .search-box {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .search-box input {
+        flex: 1;
+        font: inherit;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+        color: #1a1a1a;
+      }
+      .search-box button {
+        font: inherit;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        background: #4a90d9;
+        color: #fff;
+        cursor: pointer;
+      }
+      .search-box button:hover {
+        background: #3b7ec4;
+      }
+      #results {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .jd-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .jd-head:first-child {
+        margin-top: 0;
+      }
+      .jd-title {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 2px 8px;
+        flex: 1;
+        min-width: 0;
+      }
+      .jd-surface {
+        font-size: 18px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .jd-reading {
+        font-size: 13px;
+        color: #777;
+        white-space: nowrap;
+      }
+      .jd-sense {
+        margin: 2px 0 0 2px;
+        color: #333;
+        font-size: 14px;
+      }
+      .jd-pos {
+        font-size: 12px;
+        color: #888;
+      }
+      .jd-sense-cont {
+        margin-left: 1.1em;
+      }
+      .jd-msg {
+        color: #888;
+        font-size: 14px;
+      }
+      .jd-badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: #eef0f4;
+        color: #555;
+      }
+      .jd-formation {
+        margin: 4px 0 0 2px;
+        font-size: 13px;
+        color: #666;
+      }
+      .jd-example {
+        margin: 4px 0 0 2px;
+        font-size: 13px;
+        color: #444;
+      }
+      .jd-pitch-slot {
+        display: inline-flex;
+        align-items: center;
+      }
+      .jd-pitch {
+        display: block;
+      }
+      .jd-pitch-line {
+        fill: none;
+        stroke: #888;
+        stroke-width: 1.5;
+      }
+      .jd-pitch-drop {
+        stroke-dasharray: 1.5 1.5;
+      }
+      .jd-pitch-dot {
+        fill: #4a90d9;
+      }
+      .jd-pitch-dot-low {
+        fill: #888;
+      }
+      .jd-speak {
+        margin-left: auto;
+        align-self: center;
+        display: inline-flex;
+        padding: 3px;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        color: #999;
+        cursor: pointer;
+      }
+      .jd-speak:hover {
+        background: rgba(0, 0, 0, 0.06);
+        color: #555;
+      }
+      .jd-speak-busy {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .jd-fav {
+        align-self: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        color: #b8b8b8;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+      }
+      .jd-fav:hover {
+        background: rgba(0, 0, 0, 0.06);
+        color: #f0a500;
+      }
+      .jd-fav-on {
+        color: #f0a500;
+      }
+      .jd-fav-on:hover {
+        color: #f0a500;
+        background: rgba(0, 0, 0, 0.06);
+      }
+      .jd-flash {
+        margin-left: 8px;
+        font-size: 12px;
+        color: #c0392b;
+      }
+      .footer {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #eee;
+        text-align: left;
+      }
+      .footer a {
+        font-size: 12px;
+        color: #4a90d9;
+        text-decoration: none;
+      }
+      .footer a:hover {
+        text-decoration: underline;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1f1f1f;
+          color: #ededed;
+        }
+        .status {
+          background: #2b2b2b;
+          color: #cccccc;
+        }
+        .status.ok {
+          background: #173a28;
+          color: #6ee7a0;
+        }
+        .status.off {
+          background: #3a1f1e;
+          color: #f3a39c;
+        }
+        .search-box input {
+          background: #2a2a2a;
+          color: #ededed;
+          border-color: #444;
+        }
+        .jd-reading {
+          color: #aaa;
+        }
+        .jd-sense {
+          color: #cfcfcf;
+        }
+        .jd-pos {
+          color: #999;
+        }
+        .jd-msg {
+          color: #999;
+        }
+        .jd-badge {
+          background: #333;
+          color: #ccc;
+        }
+        .jd-formation {
+          color: #aaa;
+        }
+        .jd-example {
+          color: #bbb;
+        }
+        .jd-speak:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #ddd;
+        }
+        .jd-fav:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #ffcb47;
+        }
+        .jd-fav-on {
+          color: #ffcb47;
+        }
+        .jd-fav-on:hover {
+          color: #ffcb47;
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .jd-flash {
+          color: #e57373;
+        }
+        .footer a {
+          color: #6db3f2;
+        }
+        .footer {
+          border-top-color: #333;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1 data-i18n="popup.title">Tomoshi 查词</h1>
+      <div class="status" id="status" data-i18n="popup.checking">检测中…</div>
+    </div>
+    <div class="search-box">
+      <input
+        type="text"
+        id="query"
+        data-i18n-placeholder="popup.placeholder"
+        placeholder="输入日语或中文…"
+        autofocus
+      />
+      <button id="search" data-i18n="popup.search">查询</button>
+    </div>
+    <div id="results"></div>
+    <div class="footer">
+      <a href="#" id="open-options" data-i18n="popup.openOptions">打开设置页</a>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="pos.js"></script>
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

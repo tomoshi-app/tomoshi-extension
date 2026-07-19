@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <!-- Hidden document whose only job is audio playback: MV3 service workers
+         can't use the Audio API, and playing here (chrome-extension:// origin)
+         sidesteps the host page's media-src CSP and mixed-content rules. -->
+    <script src="offscreen.js"></script>
+  </body>
+</html>
