@@ -54,34 +54,48 @@ function saveDebounced() {
   saveTimer = setTimeout(save, 400);
 }
 
+// Render a problem state: the message carries a literal {site} placeholder that
+// we materialize as a real link (t() leaves it untouched when it isn't passed as
+// a param), plus a retry button so the user doesn't have to reload the page.
+function renderStatusProblem(el, message) {
+  el.className = "status off";
+  el.textContent = "";
+  const [before, after = ""] = message.split("{site}");
+  const link = document.createElement("a");
+  link.href = "https://tomoshi.app";
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.textContent = "tomoshi.app";
+  el.append(before, link, after);
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "retry";
+  retry.textContent = I.t("options.retry");
+  retry.addEventListener("click", checkStatus);
+  el.append(retry);
+}
+
 function checkStatus() {
   const el = $("status");
   el.className = "status";
   el.textContent = I.t("options.checking");
   chrome.runtime.sendMessage({ type: "ping" }, (res) => {
-    if (res && res.ok) {
+    if (res && res.ok && !res.outdated) {
       el.textContent = I.t("options.connected", { base: res.base });
       el.className = "status ok";
       return;
     }
-    // Disconnected: the message carries a literal {site} placeholder that we
-    // materialize as a real link (t() leaves it untouched with no params), plus
-    // a retry button so the user doesn't have to reload the page.
-    el.className = "status off";
-    el.textContent = "";
-    const [before, after = ""] = I.t("options.disconnected").split("{site}");
-    const link = document.createElement("a");
-    link.href = "https://tomoshi.app";
-    link.target = "_blank";
-    link.rel = "noreferrer";
-    link.textContent = "tomoshi.app";
-    el.append(before, link, after);
-    const retry = document.createElement("button");
-    retry.type = "button";
-    retry.className = "retry";
-    retry.textContent = I.t("options.retry");
-    retry.addEventListener("click", checkStatus);
-    el.append(retry);
+    // Connected but too old: the browser extension auto-updates within hours
+    // while the desktop app only updates when launched, so this pairing is
+    // routine after a release. Same download link as the disconnected case.
+    if (res && res.ok) {
+      renderStatusProblem(
+        el,
+        I.t("options.outdated", { version: res.version || "?", min: res.min })
+      );
+      return;
+    }
+    renderStatusProblem(el, I.t("options.disconnected"));
   });
 }
 

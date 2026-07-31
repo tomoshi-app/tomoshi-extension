@@ -9,7 +9,12 @@ const I = window.TomoshiJaDictI18n;
 function checkStatus() {
   chrome.runtime.sendMessage({ type: "ping" }, (res) => {
     const el = $("status");
-    if (res && res.ok) {
+    if (res && res.ok && res.outdated) {
+      // Connected, but the app is older than this build needs. Flagged in the
+      // same slot as "disconnected" — lookups still work, pronunciation doesn't.
+      el.textContent = I.t("popup.outdated", { min: res.min });
+      el.className = "status off";
+    } else if (res && res.ok) {
       el.textContent = I.t("popup.connected");
       el.className = "status ok";
     } else {

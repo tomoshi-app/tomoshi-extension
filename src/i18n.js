@@ -12,6 +12,7 @@
       "common.searching": "查询中…",
       "common.offline": "未连接",
       "common.engineOff": "发音引擎未启动",
+      "common.appOutdated": "需更新桌面应用至 {min}",
       "common.speak": "发音",
       "common.favAdd": "加入生词本",
       "common.favAdded": "已加入生词本（点击移除）",
@@ -30,6 +31,7 @@
       "popup.checking": "检测中…",
       "popup.connected": "已连接",
       "popup.disconnected": "未连接",
+      "popup.outdated": "桌面应用需更新到 {min} 或更高版本",
       "popup.placeholder": "输入日语或中文…",
       "popup.search": "查询",
       "popup.openOptions": "打开设置页",
@@ -39,12 +41,16 @@
       "options.connected": "已连接桌面应用：{base}",
       "options.disconnected":
         "未连接 — 请先启动 Tomoshi 桌面应用，如您尚未安装 Tomoshi 桌面应用，可前往 {site} 下载安装，如已启动，可点击「重新检测」。",
+      "options.outdated":
+        "已连接桌面应用（v{version}），但版本过旧 — 本插件的发音功能需要 {min} 或更高版本。请在 Tomoshi 桌面应用中更新，或前往 {site} 下载最新版本；更新后可点击「重新检测」。查词、生词本等功能不受影响。",
       "options.retry": "重新检测",
       "options.enable": "启用取词",
       "options.language": "界面语言",
       "options.langAuto": "跟随浏览器",
       "options.modifier": "触发键",
       "options.modifierHint": "选中文本后按住该键显示弹窗，松开关闭。",
+      "options.modifierLinkNote":
+        "提示：若想取链接中的文字，可先按住触发键，再用鼠标选中，这样不会触发链接跳转。",
       "options.limitTitle": "已知限制",
       "options.limitHint":
         "暂不支持 Google Docs 等 canvas 应用取词（其文字由画布渲染，无法被选中）。请先复制文本，再用 Tomoshi 桌面词典的全局快捷键查询。",
@@ -64,6 +70,7 @@
       "common.searching": "查詢中…",
       "common.offline": "未連線",
       "common.engineOff": "發音引擎未啟動",
+      "common.appOutdated": "需更新桌面應用程式至 {min}",
       "common.speak": "發音",
       "common.favAdd": "加入生詞本",
       "common.favAdded": "已加入生詞本（點擊移除）",
@@ -82,6 +89,7 @@
       "popup.checking": "偵測中…",
       "popup.connected": "已連線",
       "popup.disconnected": "未連線",
+      "popup.outdated": "桌面應用程式需更新至 {min} 或更新版本",
       "popup.placeholder": "輸入日語或中文…",
       "popup.search": "查詢",
       "popup.openOptions": "開啟設定頁",
@@ -91,12 +99,16 @@
       "options.connected": "已連線桌面應用程式：{base}",
       "options.disconnected":
         "未連線 — 請先啟動 Tomoshi 桌面應用程式，如您尚未安裝 Tomoshi 桌面應用程式，可前往 {site} 下載安裝，如已啟動，可點擊「重新偵測」。",
+      "options.outdated":
+        "已連線桌面應用程式（v{version}），但版本過舊 — 本擴充功能的發音功能需要 {min} 或更新版本。請在 Tomoshi 桌面應用程式中更新，或前往 {site} 下載最新版本；更新後可點擊「重新偵測」。查詞、生詞本等功能不受影響。",
       "options.retry": "重新偵測",
       "options.enable": "啟用取詞",
       "options.language": "介面語言",
       "options.langAuto": "跟隨瀏覽器",
       "options.modifier": "觸發鍵",
       "options.modifierHint": "選取文字後按住該鍵顯示彈出視窗，放開後關閉。",
+      "options.modifierLinkNote":
+        "提示：若想取連結中的文字，可先按住觸發鍵，再用滑鼠選取，這樣不會觸發連結跳轉。",
       "options.limitTitle": "已知限制",
       "options.limitHint":
         "暫不支援 Google Docs 等 canvas 應用程式取詞（其文字由畫布繪製，無法被選取）。請先複製文字，再用 Tomoshi 桌面辭典的全域快捷鍵查詢。",

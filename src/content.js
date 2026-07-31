@@ -372,6 +372,8 @@
     .jd-fav-on { color: #f0a500; }
     .jd-fav-on:hover { color: #f0a500; background: rgba(0, 0, 0, 0.06); }
     .jd-flash { margin-left: 8px; font-size: 12px; color: #c0392b; }
+    /* Own line under the header row — see the block option on flash(). */
+    .jd-flash-block { display: block; margin: 3px 0 0 2px; }
     .jd-more {
       display: block; width: 100%; margin-top: 12px; padding: 7px 10px;
       border: 1px solid #e0e0e0; border-radius: 7px;

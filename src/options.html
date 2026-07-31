@@ -65,6 +65,19 @@
       .section-label {
         font-weight: 600;
       }
+      /* 触发键提示的补充说明：链接上取词的技巧不算限制，用「注意事项」的琥珀
+         色而非灰色 hint，与桌面应用设置页「AI 结果用 OpenJTalk 发音」提示同款
+         （src/routes/settings/+page.svelte 的 .voice-note）。 */
+      .note {
+        margin-top: 2px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #b45309;
+        font-size: 12px;
+        line-height: 1.6;
+      }
       .hint-margin {
         margin-top: -10px;
         margin-bottom: 14px;
@@ -124,6 +137,9 @@
         .hint {
           color: #9a9a9a;
         }
+        .note {
+          color: #fcd34d;
+        }
         select,
         textarea {
           background: #2a2a2a;
@@ -165,6 +181,9 @@
       </label>
       <span class="hint" data-i18n="options.modifierHint"
         >选中文本后按住该键显示弹窗，松开关闭。</span
+      >
+      <span class="note" data-i18n="options.modifierLinkNote"
+        >提示：若想取链接中的文字，可先按住触发键，再用鼠标选中，这样不会触发链接跳转。</span
       >
     </div>
 

@@ -10,6 +10,12 @@
 
 先启动 Tomoshi 桌面应用（[tomoshi.app](https://tomoshi.app) 下载，或从主仓开发构建）。扩展会自动探测 `21420 → 21421 → 21422` 三个端口。
 
+### 最低桌面应用版本
+
+`src/background.js` 的 `MIN_APP_VERSION` 记录本扩展所需的最低桌面应用版本（当前 **0.97.0**，即 `/v1/tts?play=true` 由桌面端播放的首个版本；线上的 0.96.0 尚不支持）。探活 `/v1/health` 返回的 `version` 会与之比较，过旧时在设置页与 popup 的状态行提示更新，并在扩展自动更新落地时（`onInstalled` 的 `reason === "update"`）主动打开一次设置页。
+
+**改动本地 API 契约时**：只要扩展开始依赖旧版桌面应用没有的能力，就要同步抬高 `MIN_APP_VERSION`。商店会在数小时内静默推送新扩展，而桌面应用要等用户启动才更新——「新扩展 + 旧客户端」是发版后的常态而非边角情况。能力本身若可探测（如发音靠响应里 `audio` 是否非空判断旧客户端没播），优先按探测结果给精确提示，版本号只作通用兜底。
+
 ## 加载（开发）
 
 1. 打开 `chrome://extensions`
@@ -23,10 +29,11 @@
 
 | 文件 | 作用 |
 |---|---|
-| `manifest.json` | MV3 清单：权限、host_permissions、content script |
-| `src/background.js` | service worker：唯一与本地 server 通信的地方（探活 + 查词/语法/音高/发音代理 + offscreen 生命周期） |
+| `manifest.json` | MV3 清单（Chrome/Edge）：权限、host_permissions、content script |
+| `manifest.safari.json` | 同上，Safari 专用——`background` 用 `scripts` 而非 `service_worker`（Safari 这里不支持 service worker），也不带 `offscreen` 权限。`scripts/build-safari-extension.sh` 打包时会把它换成 Resources 里的 `manifest.json`；两份清单其余字段应保持同步 |
+| `src/background.js` | service worker（Safari 上是非持久背景页，见上）：唯一与本地 server 通信的地方（探活 + 查词/语法/音高/发音代理 + offscreen 生命周期） |
 | `src/content.js` | content script：选区 + 触发键 → 请求查询 → Shadow DOM 悬浮窗渲染（释义/音高图/语法兜底/发音按钮） |
-| `src/offscreen.html` `src/offscreen.js` | 隐藏文档，专门播放发音音频（绕开页面 CSP / 混合内容） |
+| `src/offscreen.html` `src/offscreen.js` | 隐藏文档，专门播放发音音频（绕开页面 CSP / 混合内容）；仅 Chromium 用得到，Safari 走桌面应用播放 |
 | `src/options.html` `src/options.js` | 设置页：界面语言、启用开关、触发键、禁用站点、连接状态 |
 | `src/i18n.js` | 界面文案 i18n（简体/繁体目录 + `t()`），content script / popup / options 共用；`_locales/` 只管 manifest 名称与描述（随浏览器语言） |
 | `src/pos.js` | JMdict 词性 → 中文标签（简繁双份）。**真源在桌面应用侧**（`posTranslations.ts`），两侧人工保持同步 |
@@ -37,11 +44,11 @@
 
 ## 发音
 
-弹窗里点喇叭图标发音 —— **保持按住触发键**的同时移动鼠标点击。需本机运行 VOICEVOX 引擎；未启动时按钮旁提示「发音引擎未启动」。
+弹窗里点喇叭图标发音 —— **保持按住触发键**的同时移动鼠标点击。音频由桌面应用合成；播放路径按浏览器分开——Chrome/Edge 用 `chrome.offscreen` 在浏览器本地播放（标签页静音、系统音量对它生效），Safari 没有该 API，改由桌面应用播放（声音来自应用而非网页标签页）。合成失败时按钮旁提示「发音引擎未启动」；Safari 若连着的桌面应用版本过旧（早于 `MIN_APP_VERSION`，见上）会提示「需更新桌面应用至 x.y.z」（多停留几秒，因为这是用户唯一必然看到该问题的时机——划词弹窗需按住触发键才可交互，不适合放常驻横幅或跳转入口，引导统一放在设置页与工具栏 popup；Chrome/Edge 不依赖这个能力，不会看到这条提示）。
 
 ## 设置
 
-首次安装后自动打开设置页（`onInstalled`，仅 `reason === "install"`，更新不触发）。之后可从 `chrome://extensions` → 本扩展 → 「扩展程序选项」，或右键扩展图标 →「选项」进入。可配置：
+首次安装后自动打开设置页（`onInstalled` 的 `reason === "install"`）。扩展更新（`reason === "update"`）只在**检测到桌面应用版本过旧**时打开一次，其余情况不打扰。之后可从 `chrome://extensions` → 本扩展 → 「扩展程序选项」，或右键扩展图标 →「选项」进入。可配置：
 
 - **界面语言**：跟随浏览器（默认）/ 简体中文 / 繁體中文，存 `uiLanguage`，切换即时生效
 - **启用取词**（总开关）
@@ -53,5 +60,4 @@
 
 ## 尚未实现（后续里程碑）
 
-- CORS 锁定到固定扩展 ID（需先在 Chrome 里确认扩展 ID）
 - 图标 + 上架 Chrome Web Store 打包

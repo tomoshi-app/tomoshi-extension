@@ -102,12 +102,23 @@
     return svg;
   }
 
-  function flash(anchor, text) {
+  // Transient error message for `anchor`. Options:
+  //   ms    — lifetime, default a glance-length 2s; pass longer for messages the
+  //           user has to act on rather than just notice.
+  //   block — render on its own line under the entry's header row instead of
+  //           inline after `anchor`. `.jd-head` is a fixed-width flex row
+  //           (词头/读音/音调图 + 喇叭/星标), so anything longer than a few
+  //           characters squeezes the headword and wraps badly as a flex item.
+  //           Short messages stay inline, where they read as attached to the
+  //           button that failed.
+  function flash(anchor, text, options) {
+    const { ms = 2000, block = false } = options || {};
     const tip = document.createElement("span");
-    tip.className = "jd-flash";
+    tip.className = block ? "jd-flash jd-flash-block" : "jd-flash";
     tip.textContent = text;
-    anchor.insertAdjacentElement("afterend", tip);
-    setTimeout(() => tip.remove(), 2000);
+    const target = (block && anchor.closest(".jd-head")) || anchor;
+    target.insertAdjacentElement("afterend", tip);
+    setTimeout(() => tip.remove(), ms);
   }
 
   function playWord(text, reading, btn, ttsFn) {
@@ -116,7 +127,18 @@
       if (!btn.isConnected) return;
       btn.classList.remove("jd-speak-busy");
       if (!res || !res.ok) {
-        flash(btn, T(res && res.reason === "offline" ? "common.offline" : "common.engineOff"));
+        const reason = res && res.reason;
+        // "outdated" = the app is running but predates desktop-side playback, so
+        // it synthesized fine and nothing came out. Say so, or the user hears
+        // silence and blames the engine. This is the one moment the user is
+        // guaranteed to be looking (they just clicked play), so it names the
+        // version to update to and lingers long enough to read — the in-page
+        // popup is held open with the trigger key and has no room for a banner.
+        if (reason === "outdated") {
+          flash(btn, T("common.appOutdated", { min: res.min }), { ms: 6000, block: true });
+          return;
+        }
+        flash(btn, T(reason === "offline" ? "common.offline" : "common.engineOff"));
       }
     });
   }
