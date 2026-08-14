@@ -23,6 +23,8 @@
       "common.notFound": "未找到「{q}」",
       "common.noWordTryGrammar": "未找到单词，查询语法…",
       "common.offlineLong": "无法连接 Tomoshi，请先启动桌面应用",
+      "common.unsupportedOs": "暂不支持 {os}",
+      "common.unsupportedOsLong": "本扩展需配合 Tomoshi 桌面应用使用，暂不支持 {os}",
       "common.lookupFail": "查询失败",
       "common.viewInApp": "在 Tomoshi 中查看详情",
       "common.searchInApp": "在 Tomoshi 中搜索",
@@ -43,6 +45,8 @@
         "未连接 — 请先启动 Tomoshi 桌面应用，如您尚未安装 Tomoshi 桌面应用，可前往 {site} 下载安装，如已启动，可点击「重新检测」。",
       "options.outdated":
         "已连接桌面应用（v{version}），但版本过旧 — 本插件的发音功能需要 {min} 或更高版本。请在 Tomoshi 桌面应用中更新，或前往 {site} 下载最新版本；更新后可点击「重新检测」。查词、生词本等功能不受影响。",
+      "options.unsupportedOs":
+        "本扩展需配合 Tomoshi 桌面应用（Windows/macOS）使用，暂不支持 {os}，因此在此设备上无法工作。后续平台支持动态请关注 {site}。",
       "options.retry": "重新检测",
       "options.enable": "启用取词",
       "options.language": "界面语言",
@@ -81,6 +85,8 @@
       "common.notFound": "找不到「{q}」",
       "common.noWordTryGrammar": "找不到單字，查詢文法…",
       "common.offlineLong": "無法連線 Tomoshi，請先啟動桌面應用程式",
+      "common.unsupportedOs": "暫不支援 {os}",
+      "common.unsupportedOsLong": "本擴充功能需搭配 Tomoshi 桌面應用程式使用，暫不支援 {os}",
       "common.lookupFail": "查詢失敗",
       "common.viewInApp": "在 Tomoshi 中檢視詳情",
       "common.searchInApp": "在 Tomoshi 中搜尋",
@@ -101,6 +107,8 @@
         "未連線 — 請先啟動 Tomoshi 桌面應用程式，如您尚未安裝 Tomoshi 桌面應用程式，可前往 {site} 下載安裝，如已啟動，可點擊「重新偵測」。",
       "options.outdated":
         "已連線桌面應用程式（v{version}），但版本過舊 — 本擴充功能的發音功能需要 {min} 或更新版本。請在 Tomoshi 桌面應用程式中更新，或前往 {site} 下載最新版本；更新後可點擊「重新偵測」。查詞、生詞本等功能不受影響。",
+      "options.unsupportedOs":
+        "本擴充功能需搭配 Tomoshi 桌面應用程式（Windows/macOS）使用，暫不支援 {os}，因此在此裝置上無法運作。後續平台支援動態請關注 {site}。",
       "options.retry": "重新偵測",
       "options.enable": "啟用取詞",
       "options.language": "介面語言",

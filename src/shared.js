@@ -111,6 +111,17 @@
   //           characters squeezes the headword and wraps badly as a flex item.
   //           Short messages stay inline, where they read as attached to the
   //           button that failed.
+  // Short label for a connection-level failure, or null when the failure is
+  // operation-specific and the caller should name it. "unsupported_os" is the
+  // background's relabeling of "offline" on a platform the desktop app doesn't
+  // ship for — "未连接" alone would read as fixable there.
+  function connErrorText(res) {
+    const reason = res && res.reason;
+    if (reason === "offline") return T("common.offline");
+    if (reason === "unsupported_os") return T("common.unsupportedOs", { os: res.os });
+    return null;
+  }
+
   function flash(anchor, text, options) {
     const { ms = 2000, block = false } = options || {};
     const tip = document.createElement("span");
@@ -138,7 +149,7 @@
           flash(btn, T("common.appOutdated", { min: res.min }), { ms: 6000, block: true });
           return;
         }
-        flash(btn, T(reason === "offline" ? "common.offline" : "common.engineOff"));
+        flash(btn, connErrorText(res) || T("common.engineOff"));
       }
     });
   }
@@ -194,13 +205,7 @@
         } else {
           flash(
             btn,
-            T(
-              res && res.reason === "offline"
-                ? "common.offline"
-                : wantOn
-                  ? "common.favAddFail"
-                  : "common.favRemoveFail"
-            )
+            connErrorText(res) || T(wantOn ? "common.favAddFail" : "common.favRemoveFail")
           );
         }
       };
@@ -325,7 +330,7 @@
       revealFn(q, (res) => {
         if (!btn.isConnected) return;
         btn.disabled = false;
-        flash(btn, T(res && res.reason === "offline" ? "common.offline" : "common.openFail"));
+        flash(btn, connErrorText(res) || T("common.openFail"));
       });
     });
     box.appendChild(btn);
@@ -335,7 +340,10 @@
     box.innerHTML = "";
     if (!res || !res.ok) {
       const reason = res && res.reason;
-      const msg = T(reason === "offline" ? "common.offlineLong" : "common.lookupFail");
+      const msg =
+        reason === "unsupported_os"
+          ? T("common.unsupportedOsLong", { os: res.os })
+          : T(reason === "offline" ? "common.offlineLong" : "common.lookupFail");
       box.innerHTML = `<div class="jd-msg">${msg}</div>`;
       return;
     }

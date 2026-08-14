@@ -1,4 +1,4 @@
-# Tomoshi 日语词典 - 划词查词（Chrome 扩展）
+# Tomoshi 日语词典 - 划词查词（Chrome / Edge 扩展）
 
 [Tomoshi](https://tomoshi.app) 日语词典的浏览器取词前端：**先选中**日语文本，**按住 Alt** 在页面内悬浮窗显示查询结果，**松开 Alt 关闭**。实际查询由本地 Tomoshi 桌面应用内置的 HTTP server 提供（`http://127.0.0.1:21420`），扩展自身**不与任何远程服务器通信**——它读取的页面内容只发往你本机的桌面应用。
 
@@ -6,13 +6,22 @@
 
 > 本仓库是发布镜像，真源在 Tomoshi 主仓的 `extension/` 目录内维护；欢迎 issue 与 PR（见 [CONTRIBUTING](CONTRIBUTING.md)），合入后会同步回真源再镜像发布。
 
+## 安装
+
+同一份代码上架两家商店，各自有独立的扩展 ID（本地 API 的 CORS 按 ID 放行，两者都在允许列表里）：
+
+- **Chrome Web Store**：<https://chromewebstore.google.com/detail/kpgcimhiancoaijmemkpdhmimaaadolj>（同样适用于 Brave、Vivaldi 等 Chromium 系浏览器）
+- **Microsoft Edge Add-ons**：<https://microsoftedge.microsoft.com/addons/detail/giighfgfdikmbaghpnhndmipggcogbkf>
+
+Safari 版不走商店，随 macOS 桌面应用一并安装，在 Safari 的「扩展」设置里启用。
+
 ## 运行前提
 
 先启动 Tomoshi 桌面应用（[tomoshi.app](https://tomoshi.app) 下载，或从主仓开发构建）。扩展会自动探测 `21420 → 21421 → 21422` 三个端口。
 
 ### 最低桌面应用版本
 
-`src/background.js` 的 `MIN_APP_VERSION` 记录本扩展所需的最低桌面应用版本（当前 **0.97.0**，即 `/v1/tts?play=true` 由桌面端播放的首个版本；线上的 0.96.0 尚不支持）。探活 `/v1/health` 返回的 `version` 会与之比较，过旧时在设置页与 popup 的状态行提示更新，并在扩展自动更新落地时（`onInstalled` 的 `reason === "update"`）主动打开一次设置页。
+`src/background.js` 的 `MIN_APP_VERSION` 记录本扩展所需的最低桌面应用版本（当前 **0.97.0**，即 `/v1/tts?play=true` 由桌面端播放的首个版本；线上的 0.96.0 尚不支持）。探活 `/v1/health` 返回的 `version` 会与之比较，过旧时在设置页与 popup 的状态行提示更新，并在扩展**版本确实变化**时（见下节「设置」）主动打开一次设置页。
 
 **改动本地 API 契约时**：只要扩展开始依赖旧版桌面应用没有的能力，就要同步抬高 `MIN_APP_VERSION`。商店会在数小时内静默推送新扩展，而桌面应用要等用户启动才更新——「新扩展 + 旧客户端」是发版后的常态而非边角情况。能力本身若可探测（如发音靠响应里 `audio` 是否非空判断旧客户端没播），优先按探测结果给精确提示，版本号只作通用兜底。
 
@@ -30,7 +39,7 @@
 | 文件 | 作用 |
 |---|---|
 | `manifest.json` | MV3 清单（Chrome/Edge）：权限、host_permissions、content script |
-| `manifest.safari.json` | 同上，Safari 专用——`background` 用 `scripts` 而非 `service_worker`（Safari 这里不支持 service worker），也不带 `offscreen` 权限。`scripts/build-safari-extension.sh` 打包时会把它换成 Resources 里的 `manifest.json`；两份清单其余字段应保持同步 |
+| `manifest.safari.json` | 同上，Safari 专用——`background` 用 `scripts` 而非 `service_worker`（Safari 这里不支持 service worker），也不带 `offscreen` 权限。打包脚本（主仓 `scripts/build-safari-extension.sh`，属桌面应用侧构建流程，不含在本镜像仓内）会把它换成 Resources 里的 `manifest.json`；两份清单其余字段应保持同步 |
 | `src/background.js` | service worker（Safari 上是非持久背景页，见上）：唯一与本地 server 通信的地方（探活 + 查词/语法/音高/发音代理 + offscreen 生命周期） |
 | `src/content.js` | content script：选区 + 触发键 → 请求查询 → Shadow DOM 悬浮窗渲染（释义/音高图/语法兜底/发音按钮） |
 | `src/offscreen.html` `src/offscreen.js` | 隐藏文档，专门播放发音音频（绕开页面 CSP / 混合内容）；仅 Chromium 用得到，Safari 走桌面应用播放 |
@@ -48,7 +57,18 @@
 
 ## 设置
 
-首次安装后自动打开设置页（`onInstalled` 的 `reason === "install"`）。扩展更新（`reason === "update"`）只在**检测到桌面应用版本过旧**时打开一次，其余情况不打扰。之后可从 `chrome://extensions` → 本扩展 → 「扩展程序选项」，或右键扩展图标 →「选项」进入。可配置：
+首次安装后自动打开设置页。扩展更新只在**检测到桌面应用版本过旧**时打开一次，其余情况不打扰。
+
+判定不能只看 `onInstalled` 的 `details.reason`：Safari 版不从商店安装，而是嵌在
+`Tomoshi.app` 里的 appex，**桌面应用每次更新都会替换 bundle、Safari 随之重新注册
+扩展**，于是即便扩展本身一字未改也会收到 `reason === "install"`——这正是「桌面应用
+每次更新后初次启动都弹设置页」的成因。故实际判据是 manifest 的 `version`：
+`background.js` 把已处理过的版本号记在 `chrome.storage.local` 的 `seenExtensionVersion`，
+与当前版本相同即视为重新注册、什么都不做。Chromium 侧 reason 本就可信，这道闸门
+不会触发。（引入该标记的一次性代价：存量安装没有记录，本改动上线后的第一次重新
+注册仍会被当成首次安装弹一次，之后才安静。）
+
+之后可从 `chrome://extensions` → 本扩展 → 「扩展程序选项」，或右键扩展图标 →「选项」进入。可配置：
 
 - **界面语言**：跟随浏览器（默认）/ 简体中文 / 繁體中文，存 `uiLanguage`，切换即时生效
 - **启用取词**（总开关）

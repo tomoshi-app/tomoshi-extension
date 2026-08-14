@@ -95,6 +95,13 @@ function checkStatus() {
       );
       return;
     }
+    // The desktop app doesn't ship for this platform — explain that instead of
+    // steering the user through a "start the app / download it" loop. The retry
+    // button stays: harmless, and it still helps if a local server does appear.
+    if (res && res.unsupportedOs) {
+      renderStatusProblem(el, I.t("options.unsupportedOs", { os: res.unsupportedOs }));
+      return;
+    }
     renderStatusProblem(el, I.t("options.disconnected"));
   });
 }

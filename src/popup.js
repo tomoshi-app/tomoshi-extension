@@ -17,6 +17,11 @@ function checkStatus() {
     } else if (res && res.ok) {
       el.textContent = I.t("popup.connected");
       el.className = "status ok";
+    } else if (res && res.unsupportedOs) {
+      // The desktop app doesn't ship for this platform, so don't imply the
+      // usual "start the app" fix.
+      el.textContent = I.t("common.unsupportedOs", { os: res.unsupportedOs });
+      el.className = "status off";
     } else {
       el.textContent = I.t("popup.disconnected");
       el.className = "status off";

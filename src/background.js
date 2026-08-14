@@ -6,6 +6,47 @@
 
 const PORTS = [21420, 21421, 21422];
 
+// The stores hand the extension to every platform their browser runs on, but
+// the desktop app it depends on ships for Windows and macOS only — everywhere
+// else "start the desktop app" is a dead end. Detected once per service-worker
+// life; connection failures are relabeled from "offline" to "unsupported_os"
+// in respond() so each surface can say so honestly.
+//
+// Probing itself stays untouched: the ports are still tried, so any setup that
+// does reach a local server keeps working.
+//
+// `getPlatformInfo` has no SteamOS value — Arch-based SteamOS reports as plain
+// "linux", so the Steam Deck rides along on that entry. An OS absent from the
+// label map falls back to its raw value rather than to null: an unknown future
+// platform still can't run the desktop app, and an odd-looking name beats
+// sending the user back into the dead end.
+//
+// "ios" isn't in Chrome's enum (iOS has no Chrome extension platform at all),
+// but it is in the cross-browser one and Safari Web Extensions do run on
+// iOS/iPadOS — labeled here so the Safari build reads right if it ever ships
+// there. Safari without `getPlatformInfo` falls back to the normal offline
+// path via the guard below.
+const DESKTOP_OS = ["win", "mac"];
+const OS_LABELS = {
+  cros: "ChromeOS",
+  linux: "Linux",
+  android: "Android",
+  ios: "iOS",
+  openbsd: "OpenBSD",
+};
+
+let unsupportedOs = null; // display name, or null on Windows/macOS
+try {
+  if (chrome.runtime.getPlatformInfo) {
+    chrome.runtime.getPlatformInfo((info) => {
+      const os = info && info.os;
+      unsupportedOs = os && !DESKTOP_OS.includes(os) ? OS_LABELS[os] || os : null;
+    });
+  }
+} catch (_) {
+  // Safari may not implement it — and only ships on macOS anyway.
+}
+
 /** True when the offscreen API exists (Chromium); false on Safari. */
 function canUseOffscreen() {
   return typeof chrome.offscreen !== "undefined";
@@ -329,8 +370,20 @@ async function ensureOffscreen() {
 
 // Always answer, even if the promise rejects, so the content script's popup
 // never hangs waiting for a reply that never arrives.
+//
+// Single choke point for every background-mediated result, which is where the
+// unsupported-platform relabeling happens: "offline" means "app not running
+// yet", but where the app can never run at all the UI needs to tell those
+// apart. The display name rides along so no other layer needs its own map.
 function respond(promise, sendResponse) {
-  promise.then(sendResponse, () => sendResponse({ ok: false, reason: "offline" }));
+  const relabel = (res) =>
+    unsupportedOs && res && !res.ok && res.reason === "offline"
+      ? { ...res, reason: "unsupported_os", os: unsupportedOs }
+      : res;
+  promise.then(
+    (res) => sendResponse(relabel(res)),
+    () => sendResponse(relabel({ ok: false, reason: "offline" }))
+  );
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -376,6 +429,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           version: cachedVersion,
           min: MIN_APP_VERSION,
           outdated: !!base && isOutdated(cachedVersion),
+          // Platform display name, or null where the app can run. Lets
+          // popup/options render the unsupported-platform status when
+          // disconnected (this response has no `reason` for respond() to relabel).
+          unsupportedOs,
         })),
         sendResponse
       );
@@ -385,24 +442,49 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
+// Last manifest version we already reacted to, in chrome.storage.local (per
+// browser profile, never synced — "have I greeted this install yet" is a
+// property of this browser, not of the account).
+const SEEN_VERSION_KEY = "seenExtensionVersion";
+
 // On first install: open the options page so the user can pick the language /
 // trigger key, and — when the desktop app isn't running — see the connection
 // hint with the tomoshi.app download link.
 //
-// On a store auto-update: open it only when the app is running *and* too old for
-// this build, since that user's pronunciation would otherwise just go quiet. A
+// On an update: open it only when the app is running *and* too old for this
+// build, since that user's pronunciation would otherwise just go quiet. A
 // current app (or none running) sees nothing; the status line in the popup and
 // options page covers the rest.
+//
+// `details.reason` alone can't carry that, because the Safari build isn't
+// installed from a store: it's an appex inside Tomoshi.app, so every desktop
+// update replaces the bundle and Safari re-registers the extension — firing
+// onInstalled with reason "install" even though the extension itself is byte
+// for byte the one already there. That is what made the options page pop up
+// after every desktop update. So the decision hangs on the manifest version
+// instead: it only moves when the extension really changed. Same version as
+// last time = a re-registration, nothing to show. On Chromium the reason is
+// trustworthy and this gate simply never fires.
+//
+// One-time cost of introducing the marker: an existing install has no stored
+// version, so the first re-registration after this ships still reads as a first
+// install and opens the page once more. From then on it's quiet.
 chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === "install") {
-    chrome.runtime.openOptionsPage();
-    return;
-  }
-  if (details.reason === "update") {
+  if (details.reason !== "install" && details.reason !== "update") return; // browser update: nothing to say
+  const version = chrome.runtime.getManifest().version;
+  chrome.storage.local.get({ [SEEN_VERSION_KEY]: null }, (state) => {
+    const seen = state[SEEN_VERSION_KEY];
+    if (seen === version) return; // same build re-registered — nothing is new
+    chrome.storage.local.set({ [SEEN_VERSION_KEY]: version });
+
+    if (!seen && details.reason === "install") {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
     getBase().then((base) => {
       if (base && isOutdated(cachedVersion)) chrome.runtime.openOptionsPage();
     });
-  }
+  });
 });
 
 // Probe once on startup so the first lookup is warm.
