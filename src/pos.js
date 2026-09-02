@@ -2,6 +2,9 @@
 // Exposed as window.TomoshiJaDictPos. Must load after i18n.js (locale source)
 // and before shared.js (consumer).
 //
+// 英文界面不进这张表：键本身就是 JMdict 解码出来的英文描述，原样返回即可
+// （jisho 等英文词典显示的也正是这一串）——同桌面应用 posTranslations.ts 的 translatePos。
+//
 // ⚠ 真源是桌面应用的 src/lib/posTranslations.ts —— 本文件是其纯 JS 移植
 // （插件无构建步骤，无法直接 import TS）。两侧的键集合与译文需保持同步：
 // 那边加了新词性映射，这边要跟着补。
@@ -47,6 +50,9 @@
       "Ichidan verb - kureru special class": "二类动词/一段动词（くれる特殊型）",
       "Ichidan verb - zuru verb (alternative form of -jiru verbs)":
         "二类动词/一段动词（ずる/じる动词）",
+      // v2a-s：唯一不带 (upper|lower) class 的二段条目（ア行下二段，得る/得/し得る），
+      // NIDAN_RE 匹配不到，只能列在表里。
+      "Nidan verb with 'u' ending (archaic)": "二段动词（下二段，u结尾，古语）",
       "Godan verb - -aru special class": "一类动词/五段动词（-aru特殊型）",
       "Godan verb with 'bu' ending": "一类动词/五段动词（ぶ结尾）",
       "Godan verb with 'gu' ending": "一类动词/五段动词（ぐ结尾）",
@@ -112,6 +118,7 @@
       "Ichidan verb - kureru special class": "二類動詞/一段動詞（くれる特殊型）",
       "Ichidan verb - zuru verb (alternative form of -jiru verbs)":
         "二類動詞/一段動詞（ずる/じる動詞）",
+      "Nidan verb with 'u' ending (archaic)": "二段動詞（下二段，u結尾，古語）",
       "Godan verb - -aru special class": "一類動詞/五段動詞（-aru特殊型）",
       "Godan verb with 'bu' ending": "一類動詞/五段動詞（ぶ結尾）",
       "Godan verb with 'gu' ending": "一類動詞/五段動詞（ぐ結尾）",
@@ -147,6 +154,8 @@
 
   function translatePos(pos) {
     const locale = window.TomoshiJaDictI18n.getLocale();
+    // English UI keeps JMdict's own wording — it is already the source string.
+    if (locale === "en") return pos;
     const known = POS_TRANSLATIONS[locale][pos];
     if (known) return known;
 

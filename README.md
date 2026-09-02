@@ -39,13 +39,15 @@ Safari 版不走商店，随 macOS 桌面应用一并安装，在 Safari 的「�
 | 文件 | 作用 |
 |---|---|
 | `manifest.json` | MV3 清单（Chrome/Edge）：权限、host_permissions、content script |
-| `manifest.safari.json` | 同上，Safari 专用——`background` 用 `scripts` 而非 `service_worker`（Safari 这里不支持 service worker），也不带 `offscreen` 权限。打包脚本（主仓 `scripts/build-safari-extension.sh`，属桌面应用侧构建流程，不含在本镜像仓内）会把它换成 Resources 里的 `manifest.json`；两份清单其余字段应保持同步 |
+| `manifest.safari.json` | 同上，Safari 专用——`background` 用 `scripts` 而非 `service_worker`（Safari 这里不支持 service worker），也不带 `offscreen` 权限；**`name` 写死字面量 `Tomoshi`**（见下）。打包脚本（主仓 `scripts/build-safari-extension.sh`，属桌面应用侧构建流程，不含在本镜像仓内）会把它换成 Resources 里的 `manifest.json`；两份清单其余字段应保持同步 |
 | `src/background.js` | service worker（Safari 上是非持久背景页，见上）：唯一与本地 server 通信的地方（探活 + 查词/语法/音高/发音代理 + offscreen 生命周期） |
 | `src/content.js` | content script：选区 + 触发键 → 请求查询 → Shadow DOM 悬浮窗渲染（释义/音高图/语法兜底/发音按钮） |
 | `src/offscreen.html` `src/offscreen.js` | 隐藏文档，专门播放发音音频（绕开页面 CSP / 混合内容）；仅 Chromium 用得到，Safari 走桌面应用播放 |
 | `src/options.html` `src/options.js` | 设置页：界面语言、启用开关、触发键、禁用站点、连接状态 |
-| `src/i18n.js` | 界面文案 i18n（简体/繁体目录 + `t()`），content script / popup / options 共用；`_locales/` 只管 manifest 名称与描述（随浏览器语言） |
+| `src/i18n.js` | 界面文案 i18n（英文/简体/繁体三份目录 + `t()`），content script / popup / options 共用；`_locales/` 只管 manifest 名称与描述（随浏览器语言） |
 | `src/pos.js` | JMdict 词性 → 中文标签（简繁双份）。**真源在桌面应用侧**（`posTranslations.ts`），两侧人工保持同步 |
+
+**两份清单的 `name` 刻意不同**（2026-09-02）：Chromium 侧是 `__MSG_extName__`，取 `_locales` 里的长名（「Tomoshi 日语词典 - 划词查词」等）——那是 Chrome Web Store / Edge Add-ons 的**条目标题**，长名是为了让用户搜「日语词典」能搜到（0.2.2 更名时的理由）。Safari 侧不进任何商店、随桌面应用分发，没有这层 SEO 需求，而设置里那栏窄，长名显示不全，故写死字面量 `Tomoshi`（品牌名三语通用，不必过 `_locales`）。`description` 两侧仍共用 `__MSG_extDesc__`。
 
 ## 触发方式
 
@@ -70,7 +72,12 @@ Safari 版不走商店，随 macOS 桌面应用一并安装，在 Safari 的「�
 
 之后可从 `chrome://extensions` → 本扩展 → 「扩展程序选项」，或右键扩展图标 →「选项」进入。可配置：
 
-- **界面语言**：跟随浏览器（默认）/ 简体中文 / 繁體中文，存 `uiLanguage`，切换即时生效
+- **界面语言**：跟随浏览器（默认）/ English / 简体中文 / 繁體中文，存 `uiLanguage`，切换即时生效。
+  「跟随浏览器」的判定：繁体（zh-TW/HK/MO/Hant）出繁体，其余 zh\*（含裸 zh 与 zh-SG）出简体，
+  **其他语言一律回落英文**（与 `manifest.json` 的 `default_locale` 一致——2026-09-02 由
+  `zh_CN` 改为 `en`，故扩展名与界面语言不会一中一英；两处必须一起改）。
+  该口径**刻意不同于**桌面应用的 `guessUiLocaleFromSystem`（那边未知语言回落 zh-CN，
+  猜的是存量安装最可能持久化的 `ui_language`），别顺手对齐
 - **启用取词**（总开关）
 - **触发键**：Alt / Ctrl / Shift
 - **禁用的网站**：在指定域名（含子域名）上不触发

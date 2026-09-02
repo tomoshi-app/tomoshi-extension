@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "Tomoshi Japanese Dictionary - Popup Lookup"
+  },
+  "extDesc": {
+    "message": "Select Japanese and hold Alt to look it up, release to close (lookups come from the local Tomoshi desktop app)."
+  }
+}

@@ -2,9 +2,18 @@
 // Exposed as window.TomoshiJaDictI18n. Must load before shared.js.
 //
 // The locale setting lives in chrome.storage.sync `uiLanguage`:
-//   "auto" (default, follows the browser UI language) | "zh-CN" | "zh-TW".
+//   "auto" (default, follows the browser UI language) | "zh-CN" | "zh-TW" | "en".
 // 术语与桌面应用 src/lib/i18n/zh-TW.ts 对齐：词典→辭典、设置→設定、
 // 快捷键→快捷鍵、应用→應用程式、连接→連線、保存→儲存、插件→擴充功能。
+// 英文术语与 src/lib/i18n/en.ts 对齐：生词本→wordbook、语速→speech rate、
+// 界面语言→interface language、划词取词→select-to-look-up；拼写按那边的英式
+// 口径（-ise/-yse）。
+//
+// ⚠️ `popup.placeholder` 三份都**不点名可输入的语种**（不写「日语或中文」这类）：
+// 界面语言与词典语言是两套独立设置，而扩展这一侧根本读不到后者——
+// /v1/health 只回 ok/name/version，反查用哪种语言取决于桌面应用装的是哪个
+// lang pack。桌面应用能按 dict_locale 在 search.placeholder / .placeholderEn
+// 之间切，这里不能，所以只描述「输入什么」，不描述「用什么语言」。
 
 (() => {
   const MESSAGES = {
@@ -34,7 +43,7 @@
       "popup.connected": "已连接",
       "popup.disconnected": "未连接",
       "popup.outdated": "桌面应用需更新到 {min} 或更高版本",
-      "popup.placeholder": "输入日语或中文…",
+      "popup.placeholder": "输入查询内容…",
       "popup.search": "查询",
       "popup.openOptions": "打开设置页",
 
@@ -96,7 +105,7 @@
       "popup.connected": "已連線",
       "popup.disconnected": "未連線",
       "popup.outdated": "桌面應用程式需更新至 {min} 或更新版本",
-      "popup.placeholder": "輸入日語或中文…",
+      "popup.placeholder": "輸入查詢內容…",
       "popup.search": "查詢",
       "popup.openOptions": "開啟設定頁",
 
@@ -132,8 +141,86 @@
       "options.autoSave": "設定自動儲存",
       "options.saved": "已儲存",
     },
+    en: {
+      "common.searching": "Looking up…",
+      "common.offline": "Not connected",
+      "common.engineOff": "Audio engine not running",
+      "common.appOutdated": "Update the desktop app to {min}",
+      "common.speak": "Play pronunciation",
+      "common.favAdd": "Add to wordbook",
+      "common.favAdded": "In your wordbook (click to remove)",
+      "common.favAddFail": "Could not add",
+      "common.favRemoveFail": "Could not remove",
+      "common.openFail": "Could not open",
+      "common.formation": "Formation: {text}",
+      "common.notFound": "No match for “{q}”",
+      "common.noWordTryGrammar": "No word found — looking for a grammar point…",
+      "common.offlineLong": "Cannot reach Tomoshi — start the desktop app first",
+      "common.unsupportedOs": "{os} not supported",
+      "common.unsupportedOsLong":
+        "This extension works with the Tomoshi desktop app, which is not available for {os} yet",
+      "common.lookupFail": "Lookup failed",
+      "common.viewInApp": "View in Tomoshi",
+      "common.searchInApp": "Search in Tomoshi",
+
+      "popup.title": "Tomoshi lookup",
+      "popup.checking": "Checking…",
+      "popup.connected": "Connected",
+      "popup.disconnected": "Not connected",
+      "popup.outdated": "The desktop app needs updating to {min} or newer",
+      "popup.placeholder": "Type a word or sentence…",
+      "popup.search": "Search",
+      "popup.openOptions": "Open settings",
+
+      "options.title": "Tomoshi select-to-look-up settings",
+      "options.checking": "Checking the connection…",
+      "options.connected": "Connected to the desktop app: {base}",
+      "options.disconnected":
+        "Not connected — start the Tomoshi desktop app first. If you have not installed it yet, download it from {site}. If it is already running, click “Check again”.",
+      "options.outdated":
+        "Connected to the desktop app (v{version}), but it is too old — this extension’s pronunciation needs {min} or newer. Update from inside the Tomoshi desktop app, or download the latest version from {site}; then click “Check again”. Lookup, the wordbook and everything else are unaffected.",
+      "options.unsupportedOs":
+        "This extension works with the Tomoshi desktop app (Windows/macOS), which is not available for {os} yet, so it cannot work on this device. Watch {site} for news about further platforms.",
+      "options.retry": "Check again",
+      "options.enable": "Enable select-to-look-up",
+      "options.language": "Interface language",
+      "options.langAuto": "Follow the browser",
+      "options.modifier": "Trigger key",
+      "options.modifierHint":
+        "Select text, then hold this key to show the popup; release to close.",
+      "options.modifierLinkNote":
+        "Tip: to look up text inside a link, hold the trigger key first and then select with the mouse — that way the link is not followed.",
+      "options.limitTitle": "Known limitations",
+      "options.limitHint":
+        "Canvas-based apps such as Google Docs are not supported (their text is painted onto a canvas and cannot be selected). Copy the text instead, then look it up with the Tomoshi desktop app’s global shortcut.",
+      "options.disabledSites": "Disabled sites",
+      "options.disabledSitesPlaceholder":
+        "One domain per line, for example:\nexample.com\nmail.google.com",
+      "options.disabledSitesHint":
+        "Select-to-look-up is not triggered on these domains (or their subdomains).",
+      "options.saveHistory": "Save lookups to the desktop app",
+      "options.saveHistoryHint":
+        "When on, the words you look up in the browser are also saved to the Tomoshi desktop app’s history.",
+      "options.speedTitle": "Speech rate",
+      "options.speedHint":
+        "The extension reads aloud at the same speed as the desktop app, following its “word rate” setting. To change it, go to Settings → Speech synthesis → Speech rate in the Tomoshi desktop app.",
+      "options.autoSave": "Settings save automatically",
+      "options.saved": "Saved",
+    },
   };
 
+  // 英文浏览器出英文，Hant 出繁体，其余 zh* 出简体，**其他语言一律回落英文**
+  // ——与 manifest 的 `default_locale`（同为 `en`）一致，故扩展清单里的名称与
+  // 扩展自身界面永远同语，不会一中一英。两处必须一起改。
+  //
+  // ⚠️ **口径与桌面应用的 `guessUiLocaleFromSystem`（src/lib/i18n/index.svelte.ts）
+  // 刻意分叉**（2026-09-02）：那边未知语言回落 zh-CN，因为它猜的是「存量安装里
+  // 最可能持久化的 ui_language」——一个迁移口径，扩展这侧没有那笔历史包袱。
+  // 别看到两处不一致就"顺手对齐"。
+  //
+  // 这次改动会翻转一批存量用户：把设置留在「跟随浏览器」、且浏览器语言既非
+  // zh* 也非 en 的（日语/法语/德语…系统），界面由简体变英文。其中在日中国人
+  // 这一批是明确的代价，设置页的语言下拉可以调回来。
   function browserLocale() {
     const lang = (
       (chrome.i18n && chrome.i18n.getUILanguage && chrome.i18n.getUILanguage()) ||
@@ -142,11 +229,16 @@
     )
       .toLowerCase()
       .replace(/_/g, "-");
-    return /^zh-?(tw|hk|mo|hant)/.test(lang) ? "zh-TW" : "zh-CN";
+    if (/^zh-?(tw|hk|mo|hant)/.test(lang)) return "zh-TW";
+    if (/^zh(-|$)/.test(lang)) return "zh-CN"; // 含裸 zh 与 zh-SG，同 preferredDictLocale
+    return "en";
   }
 
+  // Any catalog key is a valid setting; anything else (including "auto", the
+  // default) means "follow the browser". hasOwnProperty rather than a plain
+  // lookup so a stored value like "constructor" can't resolve to a non-catalog.
   function resolve(setting) {
-    return setting === "zh-CN" || setting === "zh-TW" ? setting : browserLocale();
+    return Object.prototype.hasOwnProperty.call(MESSAGES, setting) ? setting : browserLocale();
   }
 
   // Start from the browser-language guess so t() works even before init()'s
@@ -155,7 +247,7 @@
   const changeCallbacks = [];
 
   function t(key, params) {
-    let str = MESSAGES[locale][key] || MESSAGES["zh-CN"][key] || key;
+    let str = MESSAGES[locale][key] || MESSAGES["en"][key] || key;
     if (params) {
       for (const k in params) str = str.split(`{${k}}`).join(String(params[k]));
     }
