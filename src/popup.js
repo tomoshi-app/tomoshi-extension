@@ -14,6 +14,12 @@ function checkStatus() {
       // same slot as "disconnected" — lookups still work, pronunciation doesn't.
       el.textContent = I.t("popup.outdated", { min: res.min });
       el.className = "status off";
+    } else if (res && res.ok && res.extOutdated) {
+      // The reverse: the app wants a newer extension than this one (only the
+      // mainland offline zip ever stays behind — the store channel auto-updates).
+      // Everything keeps working; the settings page has the download link.
+      el.textContent = I.t("popup.extOutdated", { min: res.extMin });
+      el.className = "status off";
     } else if (res && res.ok) {
       el.textContent = I.t("popup.connected");
       el.className = "status ok";
@@ -45,12 +51,6 @@ function tts(text, reading, cb) {
   chrome.runtime.sendMessage({ type: "tts", text, reading }, cb);
 }
 
-// --- Grammar lookup --------------------------------------------------------
-
-function lookupGrammar(q, cb) {
-  chrome.runtime.sendMessage({ type: "grammar", q, limit: 5 }, cb);
-}
-
 // --- Add to wordbook -------------------------------------------------------
 
 const fav = {
@@ -69,6 +69,12 @@ const fav = {
       cb(chrome.runtime.lastError ? { ok: false, reason: "offline" } : res);
     });
   },
+  // 「收藏到」设置 + 自建本清单（多生词本，shared.js makeFav 据此决定出不出选本 chips）。
+  decks(cb) {
+    chrome.runtime.sendMessage({ type: "favoriteDecks" }, (res) => {
+      cb(chrome.runtime.lastError ? { ok: false, reason: "offline" } : res);
+    });
+  },
 };
 
 // --- Main search -----------------------------------------------------------
@@ -84,10 +90,11 @@ function doSearch() {
     if (answered) return;
     answered = true;
     clearTimeout(safety);
-    S.renderResult(box, q, result, lookupGrammar, requestPitch, tts, fav);
+    S.renderResult(box, q, result, requestPitch, tts, fav, null);
   };
   const safety = setTimeout(() => finish({ ok: false, reason: "offline" }), 9000);
-  chrome.runtime.sendMessage({ type: "lookup", q, limit: 8 }, (res) => {
+  // 工具栏弹窗是用户亲手输入：typed → 同应用搜索框，拉丁字母也按罗马字查（tokoro → ところ）。
+  chrome.runtime.sendMessage({ type: "search", q, typed: true }, (res) => {
     finish(chrome.runtime.lastError ? { ok: false, reason: "offline" } : res);
   });
 }

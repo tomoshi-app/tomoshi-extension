@@ -72,6 +72,26 @@
         max-height: 400px;
         overflow-y: auto;
       }
+      /* 有结果时（shared.js renderResult 加 .jd-split）：只滚 .jd-scroll，分类导航固定在底部。 */
+      #results.jd-split {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .jd-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .jd-foot {
+        flex-shrink: 0;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+      }
+      .jd-foot > :first-child {
+        margin-top: 0;
+      }
       .jd-head {
         display: flex;
         align-items: center;
@@ -115,27 +135,113 @@
         color: #888;
         font-size: 14px;
       }
-      .jd-badge {
+      .jd-deconj {
+        font-size: 12px;
+        color: #777;
+        margin: 0 0 6px;
+        padding: 4px 8px;
+        background: #f3f3f3;
+        border-radius: 6px;
+      }
+      /* 语法卡（shared.js renderGrammarCard）：与 content.js 那份同值。 */
+      .jd-reg-casual {
+        background: #15803d;
+      }
+      .jd-reg-neutral {
+        background: #7c3aed;
+      }
+      .jd-reg-written {
+        background: #1d4ed8;
+      }
+      .jd-reg-formal {
+        background: #b91c1c;
+      }
+      .jd-g-meaning {
+        margin: 4px 0 0 2px;
+        font-size: 14px;
+        color: #333;
+      }
+      .jd-g-senses {
+        margin: 4px 0 0 2px;
+        font-size: 14px;
+        padding-left: 1.4em;
+        color: #333;
+      }
+      .jd-g-senses li + li {
+        margin-top: 2px;
+      }
+      .jd-g-sec {
+        margin: 8px 0 0 2px;
+      }
+      .jd-g-sec-title {
         font-size: 11px;
         font-weight: 600;
-        padding: 1px 7px;
-        border-radius: 999px;
-        background: #eef0f4;
-        color: #555;
+        color: #888;
+        margin-bottom: 2px;
       }
-      .jd-formation {
-        margin: 4px 0 0 2px;
+      .jd-g-form {
         font-size: 13px;
-        color: #666;
+        color: #333;
       }
-      .jd-example {
-        margin: 4px 0 0 2px;
-        font-size: 13px;
-        color: #444;
+      .jd-g-form + .jd-g-form {
+        margin-top: 2px;
+      }
+      .jd-g-form-label {
+        font-size: 12px;
+        color: #888;
+        margin-right: 6px;
+      }
+      .jd-g-form-note {
+        font-size: 12px;
+        color: #888;
+        margin-left: 2px;
+      }
+      .jd-g-ex {
+        padding-left: 8px;
+        border-left: 2px solid #d6dae3;
+      }
+      .jd-g-ex-jp {
+        font-size: 14px;
+        color: #222;
+      }
+      .jd-g-ex-tr {
+        font-size: 12px;
+        color: #777;
+        margin-top: 1px;
       }
       .jd-pitch-slot {
         display: inline-flex;
         align-items: center;
+      }
+      /* 词头标签章（shared.js makeTags）：与 content.js 那份同值。 */
+      .jd-tags {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      .jd-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        line-height: 1;
+        padding: 3px 6px;
+        border-radius: 4px;
+        color: #fff;
+      }
+      .jd-tag-jlpt {
+        background: #1d4ed8;
+        cursor: help;
+      }
+      .jd-tag-approx {
+        font-size: 9px;
+        padding: 1px 3px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .jd-tag-common {
+        background: #15803d;
       }
       .jd-pitch {
         display: block;
@@ -210,6 +316,84 @@
         display: block;
         margin: 3px 0 0 2px;
       }
+      /* 星标选本行（多生词本，shared.js showDeckPicker）：与 content.js 那份同值。 */
+      .jd-deck-pick {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 4px 0 6px 2px;
+        padding: 6px 8px;
+        border: 1px solid #e6e8ee;
+        border-radius: 8px;
+        background: #f7f8fa;
+      }
+      .jd-deck-pick-title {
+        font-size: 12px;
+        color: #6b7280;
+        margin-right: 2px;
+      }
+      .jd-deck-chip {
+        padding: 3px 10px;
+        border: 1px solid #d6dae3;
+        border-radius: 999px;
+        background: #fff;
+        color: #333;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .jd-deck-chip:hover {
+        border-color: #4f46e5;
+        color: #4f46e5;
+        background: #eef2ff;
+      }
+      .jd-deck-chip-last {
+        border-color: #a5b4fc;
+      }
+      .jd-deck-pick-hint {
+        flex-basis: 100%;
+        font-size: 11px;
+        color: #9ca3af;
+      }
+      /* 结果分类导航（shared.js appendSectionNav）：与 content.js 那份同值。 */
+      .jd-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        margin-top: 12px;
+      }
+      .jd-nav-chip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #9ca3af;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .jd-nav-common {
+        color: #15803d;
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+      }
+      .jd-nav-grammar {
+        color: #0e7490;
+        background: #ecfeff;
+        border-color: #a5f3fc;
+      }
+      .jd-nav-count {
+        font-variant-numeric: tabular-nums;
+        opacity: 0.8;
+      }
       .footer {
         margin-top: 12px;
         padding-top: 12px;
@@ -241,6 +425,9 @@
           background: #3a1f1e;
           color: #f3a39c;
         }
+        .jd-foot {
+          border-top-color: #333;
+        }
         .search-box input {
           background: #2a2a2a;
           color: #ededed;
@@ -258,15 +445,55 @@
         .jd-msg {
           color: #999;
         }
-        .jd-badge {
-          background: #333;
-          color: #ccc;
+        .jd-nav-chip {
+          color: #757575;
         }
-        .jd-formation {
+        .jd-nav-common {
+          color: #84ab8c;
+          background: #202b22;
+          border-color: #3c5642;
+        }
+        .jd-nav-grammar {
+          color: #79a6ad;
+          background: #1f2b2e;
+          border-color: #3a545a;
+        }
+        .jd-tag-jlpt {
+          background: #1e40af;
+        }
+        .jd-tag-common {
+          background: #166534;
+        }
+        .jd-reg-casual {
+          background: #166534;
+        }
+        .jd-reg-neutral {
+          background: #5b21b6;
+        }
+        .jd-reg-written {
+          background: #1e40af;
+        }
+        .jd-reg-formal {
+          background: #991b1b;
+        }
+        .jd-g-meaning,
+        .jd-g-senses,
+        .jd-g-form {
+          color: #cfcfcf;
+        }
+        .jd-g-sec-title,
+        .jd-g-form-label,
+        .jd-g-form-note {
+          color: #999;
+        }
+        .jd-g-ex {
+          border-left-color: #444;
+        }
+        .jd-g-ex-jp {
+          color: #e5e5e5;
+        }
+        .jd-g-ex-tr {
           color: #aaa;
-        }
-        .jd-example {
-          color: #bbb;
         }
         .jd-speak:hover {
           background: rgba(255, 255, 255, 0.1);
@@ -285,6 +512,29 @@
         }
         .jd-flash {
           color: #e57373;
+        }
+        .jd-deck-pick {
+          background: #2a2a2a;
+          border-color: #3a3a3a;
+        }
+        .jd-deck-pick-title {
+          color: #9ca3af;
+        }
+        .jd-deck-chip {
+          background: #1f1f1f;
+          border-color: #444;
+          color: #ddd;
+        }
+        .jd-deck-chip:hover {
+          border-color: #818cf8;
+          color: #c7d2fe;
+          background: #2b2d4a;
+        }
+        .jd-deck-chip-last {
+          border-color: #6366f1;
+        }
+        .jd-deck-pick-hint {
+          color: #777;
         }
         .footer a {
           color: #6db3f2;

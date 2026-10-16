@@ -21,10 +21,123 @@
     );
   }
 
-  function headword(entry) {
-    const kanji = entry.kanji && entry.kanji[0] ? entry.kanji[0].text : null;
-    const kana = entry.kana && entry.kana[0] ? entry.kana[0].text : "";
-    return { surface: kanji || kana, reading: kanji ? kana : "" };
+  // ── 词头口径 ───────────────────────────────────────────────────────────────
+  // **与桌面应用的迷你词卡同口径**（src/lib/components/WordCard.svelte，规则真源
+  // src/lib/utils/headword.ts——扩展是纯 JS、import 不到，这里是它的逐条移植）：
+  //  - uk 词（JMdict「通常只写假名」且非古语义项）由假名领衔：ようやく 不显示罕用的 漸く；
+  //  - search-only 写法（其れでは）不进词头，同读音的片假名重写（アソコ）不当读音；
+  //  - 汉字领衔时常用写法（ke_pri）排在前（計り 而非异体 量り）；
+  //  - 选中文本正好是词条的某个写法时回显它（headwordLead 的 searchWord）。
+  // 改 headword.ts 的这几条规则时这里一起改。
+  const SEARCH_ONLY_KANA = "search-only kana form";
+  const SEARCH_ONLY_KANJI = "search-only kanji form";
+  const USUALLY_KANA = "word usually written using kana alone";
+  const ARCHAIC_MISC = new Set(["archaic", "poetical term", "obsolete term"]);
+
+  const kanjiOf = (entry) => entry.kanji || [];
+  const kanaOf = (entry) => entry.kana || [];
+  const hasInfo = (f, tag) => (f.info || []).includes(tag);
+  const isCommon = (f) => (f.priority || []).length > 0;
+
+  function toHiragana(s) {
+    let out = "";
+    for (const ch of s) {
+      const c = ch.codePointAt(0);
+      out += c >= 0x30a1 && c <= 0x30f6 ? String.fromCodePoint(c - 0x60) : ch;
+    }
+    return out;
+  }
+
+  function isKatakana(s) {
+    let sawKana = false;
+    for (const ch of s) {
+      const c = ch.codePointAt(0);
+      if (c >= 0x30a1 && c <= 0x30fa) sawKana = true;
+      else if (ch !== "ー") return false;
+    }
+    return sawKana;
+  }
+
+  function visibleKanji(entry) {
+    return kanjiOf(entry).filter((k) => !hasInfo(k, SEARCH_ONLY_KANJI));
+  }
+
+  function visibleKana(entry) {
+    const kana = kanaOf(entry).filter((k) => !hasInfo(k, SEARCH_ONLY_KANA));
+    const hira = new Set(kana.filter((k) => !isKatakana(k.text)).map((k) => k.text));
+    return kana.filter((k) => !(isKatakana(k.text) && hira.has(toHiragana(k.text))));
+  }
+
+  // headword.ts readingForForm：与汉字写法搭配的第一个读音（JMdict re_restr——
+  // 叢立ち 不能配 総立ち 专属的 そうだち），一个都配不上时退回首个。
+  function readingForForm(kana, form) {
+    if (form === undefined) return kana[0];
+    const fits = (k) => !(k.restricted_to || []).length || k.restricted_to.includes(form);
+    return kana.find(fits) || kana[0];
+  }
+
+  function kanaLedHeadword(entry) {
+    if (!kanjiOf(entry).length || !kanaOf(entry).length) return false;
+    return (entry.senses || []).some((s) => {
+      const misc = s.misc || [];
+      return misc.includes(USUALLY_KANA) && !misc.some((m) => ARCHAIC_MISC.has(m));
+    });
+  }
+
+  function orderedKanji(entry) {
+    const visible = visibleKanji(entry);
+    const common = visible.filter(isCommon);
+    const rest = visible.filter((k) => !isCommon(k));
+    return common.length && rest.length ? [...common, ...rest] : visible;
+  }
+
+  function headwordLead(entry, q) {
+    const kana = visibleKana(entry);
+    const first = (list) => (list[0] ? list[0].text : "");
+    const exact = (list) => list.find((f) => f.text === q);
+    if (kanaLedHeadword(entry)) {
+      return (exact(kanaOf(entry)) || kana[0] || {}).text || "";
+    }
+    return (
+      (exact(visibleKanji(entry)) || {}).text ||
+      first(orderedKanji(entry)) ||
+      (exact(kanaOf(entry)) || {}).text ||
+      first(kana)
+    );
+  }
+
+  /** 卡片要用的几样写法，各字段与 WordCard.svelte 一一对应：
+   *  - surface / reading：显示的词头与读音（读音与词头相同时为空，不重复显示）；
+   *  - pitchSurface / pitchKana：查音调图的键（getPitchAccent 同参）；
+   *  - ttsText：送去朗读的文本（假名领衔的词读假名，避开罕用汉字）；
+   *  - favWord / favReading：存进生词本的写法（favorites.ts favoriteHeadword 同口径）。 */
+  function headword(entry, q) {
+    const kanaLed = kanaLedHeadword(entry);
+    const kanji0 = visibleKanji(entry)[0];
+    const kanaFirst = kanaOf(entry)[0] ? kanaOf(entry)[0].text : "";
+    const surface = headwordLead(entry, q) || q;
+    // 标题实际显示的汉字写法（headword.ts shownKanjiForm）：读音、音调图、朗读都跟它
+    // 配对——查 総立ち 显示 総立ち／そうだち，不按首个写法 叢立ち 配成 むらだち。
+    // 假名领衔 / 纯假名词为 undefined，readingForForm 照旧取首个读音。
+    const shown =
+      !kanaLed && visibleKanji(entry).some((k) => k.text === surface) ? surface : undefined;
+    const pairKana = (readingForForm(kanaOf(entry), shown) || {}).text || "";
+    const visReading = (readingForForm(visibleKana(entry), shown) || {}).text || "";
+    const pitchSurface = shown || (kanji0 ? kanji0.text : kanaFirst || q);
+    // 生词本存的是首个汉字写法与它搭配的读音（favorites.ts favoriteHeadword），与
+    // 标题回显哪个写法无关。
+    const favForm = kanji0 ? kanji0.text : kanaFirst || q;
+    const favKana = kanji0 ? (readingForForm(kanaOf(entry), kanji0.text) || {}).text || "" : "";
+    return {
+      surface,
+      reading: visReading && visReading !== surface ? visReading : "",
+      pitchSurface,
+      pitchKana: pairKana || pitchSurface,
+      ttsText: kanaLed ? surface : pitchSurface,
+      ttsReading: visReading || pairKana,
+      favWord: kanaLed ? kanaFirst : favForm,
+      favReading: !kanaLed ? favKana : "",
+    };
   }
 
   function glossText(sense) {
@@ -167,27 +280,109 @@
     return btn;
   }
 
+  // ── 多生词本：星标时选本（2026-10-10，工作区 plans/wordbook-enhancement-plan.md §8.4 ④）──
+  //
+  // 与桌面应用 stores/favorites.ts chooseStarDeck 同口径：「收藏到」已设（target 非 null）
+  // → 一步存入，App 按设置落；每次询问但没有自建本 → 一步存入默认本；每次询问且有自建本
+  // → 星标下方展开一行本名 chips，点哪本存哪本，点外面 / Esc / 再点星标 = 收起、不收藏
+  // （同应用内选本框「关掉 = 不收藏」）。App 侧没有 /v1/decks（老版本）→ 退回一步存入。
+  // 「设为首选」刻意不在这里提供——那是 App 的 config，chips 下一行小字指去生词本页。
+
+  // 同一时刻只开一行：点另一张卡的星标时先收起上一行。
+  let openDeckPicker = null;
+
+  function closeDeckPicker() {
+    if (openDeckPicker) openDeckPicker.close();
+  }
+
+  // `info` 是 background favoriteDecks 的回包：{ decks: [{id, name}], last }。
+  // `onPick(deck)` 收 "default" 或本 id。返回 { btn, close }。
+  function showDeckPicker(btn, info, onPick) {
+    const row = document.createElement("div");
+    row.className = "jd-deck-pick";
+    const title = document.createElement("span");
+    title.className = "jd-deck-pick-title";
+    title.textContent = T("common.favPickTitle");
+    row.appendChild(title);
+
+    const chips = [{ id: "default", name: T("common.deckDefault") }, ...info.decks];
+    for (const d of chips) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "jd-deck-chip" + (d.id === info.last ? " jd-deck-chip-last" : "");
+      chip.textContent = d.name;
+      chip.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        onPick(d);
+      });
+      row.appendChild(chip);
+    }
+
+    const hint = document.createElement("span");
+    hint.className = "jd-deck-pick-hint";
+    hint.textContent = T("common.favPickHint");
+    row.appendChild(hint);
+
+    // 点行外任意处 / Esc 收起。监听挂在 document 上（取词浮层在 shadow root 里，
+    // 事件到 document 时 target 已被重定向成 host，故用 composedPath 判「在不在行内」）。
+    const onDown = (e) => {
+      const path = e.composedPath ? e.composedPath() : [];
+      if (!path.includes(row) && !path.includes(btn)) close();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") close();
+    };
+    let listening = false;
+    const timer = setTimeout(() => {
+      listening = true;
+      document.addEventListener("mousedown", onDown, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+
+    const picker = { btn, close };
+    function close() {
+      clearTimeout(timer);
+      if (listening) {
+        document.removeEventListener("mousedown", onDown, true);
+        document.removeEventListener("keydown", onKey, true);
+      }
+      row.remove();
+      if (openDeckPicker === picker) openDeckPicker = null;
+    }
+
+    (btn.closest(".jd-head") || btn).insertAdjacentElement("afterend", row);
+    return picker;
+  }
+
   // "加入生词本" star — a toggle. Reflects the entry's saved state when the popup
   // opens (already-saved words show ★), and clicking adds or removes accordingly.
-  // `fav` is { check(entryId, cb), add(payload, cb), remove(entryId, cb) }.
-  function makeFav(entry, surface, reading, fav) {
+  // `fav` is { check(entryId, cb), add(payload, cb), remove(entryId, cb),
+  // decks(cb)? } — `decks` is optional so the two hosts can adopt it separately.
+  function makeFav(entry, word, reading, fav) {
     const btn = document.createElement("button");
     btn.className = "jd-fav";
     let on = false;
 
-    const setState = (favorited) => {
+    // `deck` = 所在的自建本 {id, name}（null = 默认本 / 没收藏）：★ 的提示带上本名。
+    const setState = (favorited, deck) => {
       on = favorited;
       btn.textContent = favorited ? "★" : "☆";
-      btn.title = T(favorited ? "common.favAdded" : "common.favAdd");
+      btn.title = !favorited
+        ? T("common.favAdd")
+        : deck && deck.name
+          ? T("common.favAddedIn", { name: deck.name })
+          : T("common.favAdded");
       btn.classList.toggle("jd-fav-on", favorited);
     };
-    setState(false);
+    setState(false, null);
 
     // Reflect the current saved state so a re-shown popup for an already-saved
     // word isn't stuck on the empty star.
     if (fav.check) {
       fav.check(entry.id, (res) => {
-        if (btn.isConnected && res && res.ok) setState(!!res.favorited);
+        if (btn.isConnected && res && res.ok) setState(!!res.favorited, res.deck || null);
       });
     }
 
@@ -195,13 +390,22 @@
       e.preventDefault();
       e.stopPropagation();
       if (btn.disabled) return;
+      // 选本行开着时再点星标 = 收起、不收藏。
+      if (openDeckPicker && openDeckPicker.btn === btn) {
+        closeDeckPicker();
+        return;
+      }
+      closeDeckPicker();
       btn.disabled = true;
       const wantOn = !on;
-      const done = (res) => {
+      // `deck` = 这次存进的自建本（给 ★ 提示用），一步存入时不知道去向、不带本名。
+      const done = (deck) => (res) => {
         if (!btn.isConnected) return;
         btn.disabled = false;
         if (res && res.ok) {
-          setState(wantOn);
+          setState(wantOn, deck);
+        } else if (res && res.reason === "deck_gone") {
+          flash(btn, T("common.favDeckGone"), { ms: 4000, block: true });
         } else {
           flash(
             btn,
@@ -209,63 +413,293 @@
           );
         }
       };
-      if (wantOn) {
-        const meaning = (entry.senses || []).map(glossText).find((t) => t) || "";
-        const payload = {
-          entryId: entry.id,
-          word: surface,
-          reading: reading || null,
-          meaning: meaning ? meaning.slice(0, 80) : null,
-        };
-        fav.add(payload, done);
-      } else {
-        fav.remove(entry.id, done);
+      if (!wantOn) {
+        fav.remove(entry.id, done(null));
+        return;
       }
+      const meaning = (entry.senses || []).map(glossText).find((t) => t) || "";
+      const payload = {
+        entryId: entry.id,
+        word,
+        reading: reading || null,
+        meaning: meaning ? meaning.slice(0, 80) : null,
+      };
+      if (!fav.decks) {
+        fav.add(payload, done(null));
+        return;
+      }
+      fav.decks((info) => {
+        if (!btn.isConnected) return;
+        const ask =
+          info && info.ok && info.target === null && Array.isArray(info.decks) && info.decks.length;
+        if (!ask) {
+          fav.add(payload, done(null));
+          return;
+        }
+        btn.disabled = false;
+        openDeckPicker = showDeckPicker(btn, info, (d) => {
+          btn.disabled = true;
+          fav.add({ ...payload, deck: d.id }, done(d.id === "default" ? null : d));
+        });
+      });
     });
     return btn;
+  }
+
+  // ── 语法卡（2026-10-15 改版）：桌面应用 GrammarCard.svelte 的精简版 ──────────────
+  // 头部：句型 + 读音 + JLPT 章（同词条那枚）+ 语体章；正文：多义时编号列义项（v2 数据
+  // `senses`，单义 / 旧数据回落整段 `meaning`）→ 接续逐条分行（parseFormation）→
+  // 第一个例句（日文一行、译文另起一行）。用法 / 注意 / 易混淆不搬，底部按钮进应用看全。
+
+  // 接续段切分：src/lib/grammarText.ts splitTopLevel / formationSep / parseFormation 的
+  // 逐条移植（扩展 import 不到）。启发式、不吞字：切不出就整段一行。改那边时这里一起改。
+  const F_OPEN = new Set(["（", "(", "「", "『", "［", "["]);
+  const F_CLOSE = new Set(["）", ")", "」", "』", "］", "]"]);
+
+  function formationSep(str, i) {
+    const ch = str[i];
+    if (ch === "\n" || ch === "；" || ch === "。") return 1;
+    if (ch === ";" && (i + 1 >= str.length || /\s/.test(str[i + 1]))) return 1;
+    if (ch === "." && /\s/.test(str[i + 1] || "") && /[A-Z]/.test(str[i + 2] || "")) return 1;
+    return 0;
+  }
+
+  // 括号深度为 0 处才算分隔符——英文括注里常见 "(e.g., 食べて → 食べちゃう; …)"。
+  function splitTopLevel(text, isSep) {
+    const out = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (F_OPEN.has(ch)) depth++;
+      else if (F_CLOSE.has(ch)) depth = Math.max(0, depth - 1);
+      else if (depth === 0) {
+        const len = isSep(text, i);
+        if (len > 0) {
+          out.push(text.slice(start, i));
+          i += len - 1;
+          start = i + 1;
+        }
+      }
+    }
+    out.push(text.slice(start));
+    return out.map((x) => x.trim()).filter(Boolean);
+  }
+
+  function matchingOpen(text, closeIdx) {
+    let depth = 0;
+    for (let i = closeIdx; i >= 0; i--) {
+      const ch = text[i];
+      if (F_CLOSE.has(ch)) depth++;
+      else if (F_OPEN.has(ch)) {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  /** → [{ label, formula, note }]：「口语缩略：…」这类前缀标签与句尾括注拆出来弱化显示。 */
+  function parseFormation(text) {
+    return splitTopLevel(text.replace(/\r/g, ""), formationSep).map((seg) => {
+      let f = seg.replace(/[。.]\s*$/, "").trim();
+      let label = "";
+      const m = /^([^＋+→（(「\n，,。.]{1,28}?)[：:]\s*(?=\S)/.exec(f);
+      if (m) {
+        label = m[1].trim();
+        f = f.slice(m[0].length);
+      }
+      let note = "";
+      const last = f[f.length - 1];
+      if (last === "）" || last === ")") {
+        const open = matchingOpen(f, f.length - 1);
+        if (open > 0) {
+          note = f.slice(open + 1, -1).trim();
+          f = f.slice(0, open).trim();
+        }
+      }
+      return { label, formula: f, note };
+    });
+  }
+
+  // 语体：数据值恒为简体四档（同桌面 RegisterTag），显示文案走 i18n，类名用固定英文键。
+  const REGISTER_KEY = { 口语: "casual", 中性: "neutral", 书面: "written", 正式: "formal" };
+
+  function grammarSection(titleKey) {
+    const sec = document.createElement("div");
+    sec.className = "jd-g-sec";
+    const title = document.createElement("div");
+    title.className = "jd-g-sec-title";
+    title.textContent = T(titleKey);
+    sec.appendChild(title);
+    return sec;
   }
 
   function renderGrammarCard(box, g) {
     const head = document.createElement("div");
     head.className = "jd-head";
-    head.innerHTML =
-      `<span class="jd-surface">${escapeHtml(g.pattern)}</span>` +
-      (g.level ? `<span class="jd-badge">${escapeHtml(g.level)}</span>` : "");
+    const title = document.createElement("span");
+    title.className = "jd-title";
+    const pattern = document.createElement("span");
+    pattern.className = "jd-surface";
+    pattern.textContent = g.pattern;
+    title.appendChild(pattern);
+    if (g.reading && g.reading !== g.pattern) {
+      const reading = document.createElement("span");
+      reading.className = "jd-reading";
+      reading.textContent = g.reading;
+      title.appendChild(reading);
+    }
+    const reg = REGISTER_KEY[g.register];
+    if (g.level || reg) {
+      const tags = document.createElement("span");
+      tags.className = "jd-tags";
+      if (g.level) tags.appendChild(jlptTag(g.level, "grammar.jlptTitle"));
+      if (reg) {
+        const r = document.createElement("span");
+        r.className = `jd-tag jd-reg-${reg}`;
+        r.textContent = T(`grammar.register.${reg}`);
+        tags.appendChild(r);
+      }
+      title.appendChild(tags);
+    }
+    head.appendChild(title);
     box.appendChild(head);
-    if (g.meaning) {
+
+    const senses = (g.senses || []).filter((x) => x && x.gloss);
+    if (senses.length > 1) {
+      const ol = document.createElement("ol");
+      ol.className = "jd-g-senses";
+      for (const x of senses) {
+        const li = document.createElement("li");
+        li.textContent = x.gloss;
+        ol.appendChild(li);
+      }
+      box.appendChild(ol);
+    } else if (g.meaning || senses.length) {
       const m = document.createElement("div");
-      m.className = "jd-sense";
-      m.textContent = g.meaning;
+      m.className = "jd-g-meaning";
+      m.textContent = g.meaning || senses[0].gloss;
       box.appendChild(m);
     }
-    if (g.formation) {
-      const f = document.createElement("div");
-      f.className = "jd-formation";
-      f.textContent = T("common.formation", { text: g.formation });
-      box.appendChild(f);
+
+    const forms = g.formation ? parseFormation(g.formation) : [];
+    if (forms.length) {
+      const sec = grammarSection("grammar.formationTitle");
+      for (const it of forms) {
+        const row = document.createElement("div");
+        row.className = "jd-g-form";
+        if (it.label) {
+          const l = document.createElement("span");
+          l.className = "jd-g-form-label";
+          l.textContent = it.label;
+          row.appendChild(l);
+        }
+        row.appendChild(document.createTextNode(it.formula));
+        if (it.note) {
+          const n = document.createElement("span");
+          n.className = "jd-g-form-note";
+          // 括号随文字选半角 / 全角（桌面 GrammarCard 的 paren 同规）。
+          n.textContent = /^[\x20-\x7e]/.test(it.note) ? `(${it.note})` : `（${it.note}）`;
+          row.appendChild(n);
+        }
+        sec.appendChild(row);
+      }
+      box.appendChild(sec);
     }
-    const ex = g.examples && g.examples[0];
-    if (ex && ex.jp) {
+
+    const ex = (g.examples || []).find((x) => x && x.jp);
+    if (ex) {
+      const sec = grammarSection("grammar.exampleTitle");
       const e = document.createElement("div");
-      e.className = "jd-example";
-      e.textContent = ex.zho ? `${ex.jp} — ${ex.zho}` : ex.jp;
-      box.appendChild(e);
+      e.className = "jd-g-ex";
+      const jp = document.createElement("div");
+      jp.className = "jd-g-ex-jp";
+      jp.lang = "ja";
+      jp.textContent = ex.jp;
+      e.appendChild(jp);
+      if (ex.zho) {
+        const tr = document.createElement("div");
+        tr.className = "jd-g-ex-tr";
+        tr.textContent = ex.zho;
+        e.appendChild(tr);
+      }
+      sec.appendChild(e);
+      box.appendChild(sec);
     }
   }
 
-  function renderGrammar(box, q, entries) {
-    box.innerHTML = "";
-    if (!entries.length) {
-      box.innerHTML = `<div class="jd-msg">${T("common.notFound", { q: escapeHtml(q) })}</div>`;
-      return;
-    }
-    entries.slice(0, 4).forEach((g) => renderGrammarCard(box, g));
+  // JLPT 章：级别 +「非官方」小章，hover 出约估说明。词条与语法各用各的说明
+  // （`titleKey`，同桌面 dict.jlptTitle / grammar.jlptTitle）。
+  function jlptTag(level, titleKey) {
+    const tag = document.createElement("span");
+    tag.className = "jd-tag jd-tag-jlpt";
+    tag.title = T(titleKey, { level });
+    tag.textContent = level;
+    const approx = document.createElement("span");
+    approx.className = "jd-tag-approx";
+    approx.textContent = T("common.tagUnofficial");
+    tag.appendChild(approx);
+    return tag;
   }
 
-  function renderEntries(box, entries, pitchFn, ttsFn, fav) {
-    for (const entry of entries.slice(0, 6)) {
-      const { surface, reading } = headword(entry);
-      const kana = entry.kana && entry.kana[0] ? entry.kana[0].text : surface;
+  // 词头标签章（2026-10-15）：JLPT 级别 + 常用——划词时一眼看出这个词值不值得收藏。
+  // 取桌面应用 EntryTags.svelte 的前两枚、同文同色（JLPT 实心蓝带「非官方」小章，hover
+  // 出约估说明；常用实心绿）；自他 / 语体章不搬，浮窗只有 340px 宽。两个字段 /v1/lookup
+  // 一直就有（DictEntry.jlpt_level / is_common），不依赖新版桌面应用。
+  // 整组作为 jd-title 的一个 flex 项、内部不折行：放不下时两枚一起换到下一行。
+  function makeTags(entry) {
+    if (!entry.jlpt_level && !entry.is_common) return null;
+    const wrap = document.createElement("span");
+    wrap.className = "jd-tags";
+    if (entry.jlpt_level) wrap.appendChild(jlptTag(entry.jlpt_level, "common.tagJlptTitle"));
+    if (entry.is_common) {
+      const common = document.createElement("span");
+      common.className = "jd-tag jd-tag-common";
+      common.textContent = T("common.tagCommon");
+      wrap.appendChild(common);
+    }
+    return wrap;
+  }
+
+  // 浮层里最多列几条，超出的由底部分类导航报总数、「查看详情」进应用看全。词条（常用 +
+  // 非常用合计）6 条，同桌面迷你词卡；语法 3 条，同搜索下拉的 GRAMMAR_CAP——语法卡比
+  // 词条高得多，夹在两组词条之间时再多就把非常用词挤出一屏。
+  const WORDS_SHOWN = 6;
+  const GRAMMAR_SHOWN = 3;
+
+  // ── 结果分类导航（2026-10-15）：「常用词 n · 语法 n · 非常用词 n」，放在「查看详情」上方 ──
+  // 仿桌面应用搜索下拉的 .sug-nav（SearchBar.svelte）：同样三类、同样顺序、同色。计数是
+  // 查询结果里的 `sections`（App 的 /v1/search 算好下发；老 App 由 background.js 用老端点
+  // 拼出同样的数），上限与应用结果页相同（词条 20 / 语法 30），数字对得上应用里看到的。
+  // 浮层只列前几条，导航让人知道「还有多少」（として 有 7 条语法，浮层只列 3 条）。
+  // 只是摘要、不可点：浮层要按住触发键才能交互，跳转统一走下面那颗按钮。
+  // 出现条件同 suggest 的 showNav：至少两类有结果，或某一类多于浮层列出的条数。
+  const NAV_SECTIONS = ["common", "grammar", "uncommon"];
+
+  function appendSectionNav(box, counts, overflowing) {
+    const present = NAV_SECTIONS.filter((id) => counts[id] > 0);
+    if (!present.length || (present.length < 2 && !overflowing)) return;
+    const nav = document.createElement("div");
+    nav.className = "jd-nav";
+    nav.setAttribute("aria-label", T("nav.label"));
+    for (const id of present) {
+      const chip = document.createElement("span");
+      chip.className = `jd-nav-chip jd-nav-${id}`;
+      chip.textContent = T(`nav.${id}`);
+      const n = document.createElement("span");
+      n.className = "jd-nav-count";
+      n.textContent = String(counts[id]);
+      chip.appendChild(n);
+      nav.appendChild(chip);
+    }
+    box.appendChild(nav);
+  }
+
+  function renderEntries(box, q, entries, pitchFn, ttsFn, fav) {
+    for (const entry of entries) {
+      const hw = headword(entry, q);
+      const { surface, reading } = hw;
       const head = document.createElement("div");
       head.className = "jd-head";
       // 词头/读音/音调图收进可换行的 jd-title 组：放不下时整项换到下一行，
@@ -279,13 +713,19 @@
       const pitchSlot = document.createElement("span");
       pitchSlot.className = "jd-pitch-slot";
       head.firstElementChild.appendChild(pitchSlot);
-      if (kana) pitchFn(surface, kana, pitchSlot);
+      if (hw.pitchKana) pitchFn(hw.pitchSurface, hw.pitchKana, pitchSlot);
+      const tags = makeTags(entry);
+      if (tags) head.firstElementChild.appendChild(tags);
 
-      head.appendChild(makeSpeaker(surface, kana, ttsFn));
-      if (fav && entry.id) head.appendChild(makeFav(entry, surface, reading, fav));
+      head.appendChild(makeSpeaker(hw.ttsText, hw.ttsReading, ttsFn));
+      if (fav && entry.id) head.appendChild(makeFav(entry, hw.favWord, hw.favReading, fav));
       box.appendChild(head);
 
-      (entry.senses || []).slice(0, 4).forEach((sense, i) => {
+      // 展示上限。**与桌面应用的迷你词卡同值**（src/lib/components/WordCard.svelte
+      // 的 GLOSS_CAP）——同一张卡在两处给出的义项数不该不一样，改一边就要改另一边。
+      // 被截掉的义项由底部那颗「查看详情」通向应用（appendMoreButton）。
+      const GLOSS_CAP = 3;
+      (entry.senses || []).slice(0, GLOSS_CAP).forEach((sense, i) => {
         const text = glossText(sense);
         if (!text) return;
         const line = document.createElement("div");
@@ -336,8 +776,76 @@
     box.appendChild(btn);
   }
 
-  function renderResult(box, q, res, grammarFn, pitchFn, ttsFn, fav, revealFn) {
+  // ── 活用还原解释（2026-10-10）：所选文本不是任何结果的写法时（たべた → 食べる），顶部出
+  // 「「たべた」是「食べる」的过去形（た形）」，与 App 结果页 / 下拉同一句、同一套 label
+  // （deconjugate.rs 的 Rule.label；念法见 App src/lib/deconjHint.ts：从辞书形往外念，链式
+  // label 后面紧跟的一步恰是其中间形的纯消费者时才并掉、其余照念，する 剥离那步不念）。
+  // DECONJ_CHAIN_CONSUMER 与 App 的 CHAIN_CONSUMER 同表。
+  const DECONJ_CHAIN_CONSUMER = {
+    "past negative": "negative",
+    "polite past": "polite",
+    "polite past negative": "polite",
+    "polite negative": "polite",
+    "polite volitional": "polite",
+    progressive: "te-form",
+    "polite progressive": "te-form",
+    "past progressive": "te-form",
+    "progressive (colloquial)": "te-form",
+    "negative desire": "desire",
+    "past desire": "desire",
+    "negative continuative": "negative (zu)",
+    "conditional (tara)": "past",
+  };
+  const DECONJ_CHAIN = new Set(Object.keys(DECONJ_CHAIN_CONSUMER));
+  const DECONJ_KNOWN = new Set([
+    ...DECONJ_CHAIN,
+    "past",
+    "te-form",
+    "polite",
+    "desire",
+    "while",
+    "negative",
+    "negative (zu)",
+    "negative (nu)",
+    "passive",
+    "causative",
+    "causative passive",
+    "potential",
+    "conditional",
+    "imperative",
+    "volitional",
+    "stem",
+    "potential/passive",
+    "potential (colloquial)",
+    "adverbial",
+    "adverbial (ni)",
+    "nominalized",
+    "conditional (nara)",
+    "polite (desu)",
+    "polite negative (arimasen)",
+  ]);
+  const stepName = (l) => (DECONJ_KNOWN.has(l) ? T("deconj.step." + l) : "");
+  function describeDeconj(steps) {
+    const real = (steps || []).filter((l) => l !== "dictionary");
+    if (!real.length) return "";
+    const kept = [];
+    for (let i = 0; i < real.length; i++) {
+      kept.push(real[i]);
+      if (DECONJ_CHAIN.has(real[i]) && real[i + 1] === DECONJ_CHAIN_CONSUMER[real[i]]) i++;
+    }
+    return kept.reverse().map(stepName).filter(Boolean).join(" → ");
+  }
+  // `res` 是 background.js search() 的回包：{ ok, entries, grammar, sections, deconj }
+  // ——一次查询全部到齐（App 1.1.2 起的 /v1/search；老 App 由 background 用老端点拼出同样
+  // 形状），这里同步渲染，不再有「未找到单词，查询语法…」的中间态。
+  //
+  // 有结果时 box 分两块（2026-10-15）：上面 .jd-scroll 放查询结果、自己滚动，下面
+  // .jd-foot 放分类导航与「查看详情」、固定不动——结果长到要滚时，这两样不必滚到底才
+  // 看得见。box 加 .jd-split 切成纵向 flex（样式在 content.js STYLE 与 popup.html 各一份）；
+  // 「查询中…」与连接失败这类单行提示不分块，照旧一个 .jd-msg。
+  function renderResult(box, q, res, pitchFn, ttsFn, fav, revealFn) {
     box.innerHTML = "";
+    box.classList.remove("jd-split");
     if (!res || !res.ok) {
       const reason = res && res.reason;
       const msg =
@@ -348,26 +856,56 @@
       return;
     }
     const entries = res.entries || [];
-    if (!entries.length) {
-      box.innerHTML = `<div class="jd-msg">${T("common.noWordTryGrammar")}</div>`;
-      grammarFn(q, (gres) => {
-        if (!gres || !gres.ok) {
-          box.innerHTML = `<div class="jd-msg">${T("common.notFound", { q: escapeHtml(q) })}</div>`;
-        } else {
-          renderGrammar(box, q, gres.entries || []);
-        }
-        // No dictionary word match: still offer a jump into the app, relabeled to
-        // "搜索" so the user can look `q` up there (dictionary + AI) themselves.
-        if (revealFn) appendMoreButton(box, q, revealFn, T("common.searchInApp"));
-      });
+    const grammar = res.grammar || [];
+    const scroll = document.createElement("div");
+    scroll.className = "jd-scroll";
+    const foot = document.createElement("div");
+    foot.className = "jd-foot";
+    box.classList.add("jd-split");
+    box.appendChild(scroll);
+    box.appendChild(foot);
+    if (!entries.length && !grammar.length) {
+      scroll.innerHTML = `<div class="jd-msg">${T("common.notFound", { q: escapeHtml(q) })}</div>`;
+      // Nothing at all: still offer a jump into the app, relabeled "搜索" so the
+      // user can look `q` up there (dictionary + AI) themselves.
+      if (revealFn) appendMoreButton(foot, q, revealFn, T("common.searchInApp"));
+      if (!foot.childElementCount) foot.remove();
       return;
     }
-    renderEntries(box, entries, pitchFn, ttsFn, fav);
-    if (revealFn) appendMoreButton(box, q, revealFn);
+    // 活用还原解释：所选文本不是任何结果的写法时 App 才给（null = 不出）。
+    const forms = res.deconj ? describeDeconj(res.deconj.steps) : "";
+    if (forms) {
+      const note = document.createElement("div");
+      note.className = "jd-deconj";
+      note.textContent = T("deconj.note", { from: res.deconj.from, base: res.deconj.base, forms });
+      scroll.appendChild(note);
+    }
+    // 分段顺序同搜索下拉（commands::dict::order_sections）与底部导航：常用词 → 语法 →
+    // 非常用词。查 をめぐって 时，罕用的同形词条排在它的语法点后面，而不是独占首屏、
+    // 语法只剩一个计数。段内保持 App 给的相关度顺序；词条两段合计 WORDS_SHOWN 条，
+    // 常用的先占位。
+    const common = entries.filter((e) => e.is_common).slice(0, WORDS_SHOWN);
+    const uncommon = entries.filter((e) => !e.is_common).slice(0, WORDS_SHOWN - common.length);
+    const shownGrammar = grammar.slice(0, GRAMMAR_SHOWN);
+    renderEntries(scroll, q, common, pitchFn, ttsFn, fav);
+    shownGrammar.forEach((g) => renderGrammarCard(scroll, g));
+    renderEntries(scroll, q, uncommon, pitchFn, ttsFn, fav);
+    appendSectionNav(
+      foot,
+      res.sections || {},
+      common.length + uncommon.length < entries.length || shownGrammar.length < grammar.length
+    );
+    // 有任何结果都叫「查看详情」：应用里的搜索会落到同一批词条 / 语法卡（语法卡在应用
+    // 里还有用法、注意与易混淆）。
+    if (revealFn) appendMoreButton(foot, q, revealFn);
+    // 工具栏弹窗没有「查看详情」，导航又没出（结果少）时底栏是空的，别留一条分隔线。
+    if (!foot.childElementCount) foot.remove();
   }
 
   window.TomoshiJaDictShared = {
     MAX_LEN,
+    headword,
+    describeDeconj,
     renderPitchSvg,
     renderResult,
   };

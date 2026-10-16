@@ -57,15 +57,17 @@ function saveDebounced() {
 // Render a problem state: the message carries a literal {site} placeholder that
 // we materialize as a real link (t() leaves it untouched when it isn't passed as
 // a param), plus a retry button so the user doesn't have to reload the page.
-function renderStatusProblem(el, message) {
+// `site` overrides the link (href + visible text) when the fix lives somewhere
+// other than the home page — the offline zip's download page, for instance.
+function renderStatusProblem(el, message, site) {
   el.className = "status off";
   el.textContent = "";
   const [before, after = ""] = message.split("{site}");
   const link = document.createElement("a");
-  link.href = "https://tomoshi.app";
+  link.href = site ? site.href : "https://tomoshi.app";
   link.target = "_blank";
   link.rel = "noreferrer";
-  link.textContent = "tomoshi.app";
+  link.textContent = site ? site.text : "tomoshi.app";
   el.append(before, link, after);
   const retry = document.createElement("button");
   retry.type = "button";
@@ -80,7 +82,7 @@ function checkStatus() {
   el.className = "status";
   el.textContent = I.t("options.checking");
   chrome.runtime.sendMessage({ type: "ping" }, (res) => {
-    if (res && res.ok && !res.outdated) {
+    if (res && res.ok && !res.outdated && !res.extOutdated) {
       el.textContent = I.t("options.connected", { base: res.base });
       el.className = "status ok";
       return;
@@ -88,11 +90,27 @@ function checkStatus() {
     // Connected but too old: the browser extension auto-updates within hours
     // while the desktop app only updates when launched, so this pairing is
     // routine after a release. Same download link as the disconnected case.
-    if (res && res.ok) {
+    if (res && res.ok && res.outdated) {
       renderStatusProblem(
         el,
         I.t("options.outdated", { version: res.version || "?", min: res.min })
       );
+      return;
+    }
+    // The reverse pairing: the app is newer than this extension wants to be.
+    // Only the mainland offline zip stays behind for good (the store channel
+    // auto-updates), so that install gets the zip page as the link; a store
+    // install is just told to let the browser catch up.
+    if (res && res.ok) {
+      const params = { version: res.extVersion, min: res.extMin };
+      if (res.extOffline) {
+        renderStatusProblem(el, I.t("options.extOutdatedOffline", params), {
+          href: "https://tomoshi.cn/download/extension/",
+          text: "tomoshi.cn/download/extension/",
+        });
+      } else {
+        renderStatusProblem(el, I.t("options.extOutdatedStore", params));
+      }
       return;
     }
     // The desktop app doesn't ship for this platform — explain that instead of
