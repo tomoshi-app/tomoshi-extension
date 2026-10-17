@@ -214,12 +214,15 @@ async function deconj(q) {
 }
 
 // 合并查询（2026-10-15，桌面 1.1.2 起有 /v1/search）：一次回齐词条、语法、分类计数与
-// 活用还原解释，弹窗只认这一种形状 { entries, grammar, sections, deconj }。老 App 对
+// 活用还原解释，弹窗只认这一种形状 { entries, grammar, sections, common, deconj }。老 App 对
 // /v1/search 404 → 用老的 /v1/lookup + /v1/grammar + /v1/deconj 拼出同样的形状：商店会
 // 在 App 更新前就把新扩展推下去，「新扩展 + 旧 App」是常态。上限与 App 侧
 // SEARCH_ENTRY_LIMIT / SEARCH_GRAMMAR_LIMIT（应用结果页的 20 / 30）同值。
 // `typed`：用户在工具栏弹窗里亲手输入的 → 按搜索框口径认罗马字；网页划词不认（老 App
 // 的回落路径一律不认，那几个老端点没有这个选项）。
+// ⚠️ App 靠 `/v1/lookup` 的 limit 区分「0.3.0 的回落路径」与「0.2.x 老扩展」（离线版过旧
+// 提醒，src-tauri/src/server/mod.rs `SEARCH_FALLBACK_LOOKUP_LIMIT`，单测钉住两处同值），
+// 改这个数要连 App 那边一起改。
 const SEARCH_ENTRY_LIMIT = 20;
 const SEARCH_GRAMMAR_LIMIT = 30;
 
@@ -233,6 +236,9 @@ async function search(q, typed) {
         entries: d.entries || [],
         grammar: d.grammar || [],
         sections: d.sections || sectionCounts(d.entries || [], (d.grammar || []).length),
+        // 与 entries 等长的「这次算不算常用命中」（按命中写法判，2026-10-16 起的 App 才回）；
+        // 缺省时弹窗回落词条级 is_common。
+        common: Array.isArray(d.common) ? d.common : null,
         deconj: d.deconj || null,
       };
     }
@@ -253,11 +259,13 @@ async function search(q, typed) {
     entries: words.entries,
     grammar: gram,
     sections: sectionCounts(words.entries, gram.length),
+    common: null,
     deconj: d && d.ok ? d.hint : null,
   };
 }
 
-// 同 App 侧 search_sections：常用 / 非常用按 JMdict 常用标记 is_common 分。
+// 老 App 回落路径的计数：常用 / 非常用按词条级 is_common 分（新 App 的 search_sections
+// 改按命中写法判，老端点不带那份信息）。
 function sectionCounts(entries, grammarCount) {
   const common = entries.filter((e) => e.is_common).length;
   return { common, grammar: grammarCount, uncommon: entries.length - common };

@@ -92,14 +92,24 @@
       .jd-foot > :first-child {
         margin-top: 0;
       }
+      /* 词头行：标题换行时发音 / 收藏钮贴住第一行（同 content.js 那份的注释）。 */
       .jd-head {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
         margin-top: 12px;
       }
       .jd-head:first-child {
         margin-top: 0;
+      }
+      /* 词条 / 语法卡之间的分隔线（shared.js entryWrap），颜色同 .jd-foot 上沿。 */
+      .jd-entry + .jd-entry {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+      }
+      .jd-deconj + .jd-entry {
+        margin-top: 12px;
       }
       .jd-title {
         display: flex;
@@ -111,6 +121,7 @@
       }
       .jd-surface {
         font-size: 18px;
+        line-height: 26px;
         font-weight: 600;
         white-space: nowrap;
       }
@@ -180,21 +191,79 @@
         margin-bottom: 2px;
       }
       .jd-g-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 6px;
         font-size: 13px;
+        line-height: 1.6;
         color: #333;
       }
-      .jd-g-form + .jd-g-form {
-        margin-top: 2px;
+      .jd-g-form + .jd-g-form,
+      .jd-g-form + .jd-g-form-prose,
+      .jd-g-form-prose + .jd-g-form {
+        margin-top: 4px;
       }
       .jd-g-form-label {
         font-size: 12px;
         color: #888;
-        margin-right: 6px;
       }
       .jd-g-form-note {
         font-size: 12px;
-        color: #888;
-        margin-left: 2px;
+        color: #6b7280;
+        padding: 0 6px;
+        border-radius: 3px;
+        background: #f3f4f6;
+      }
+      .jd-g-form-prose {
+        display: block;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #374151;
+      }
+      .jd-g-formula {
+        padding: 1px 8px;
+        border-radius: 4px;
+        background: #f3f4f6;
+        font-weight: 600;
+      }
+      .jd-g-fx {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 3px;
+      }
+      .jd-fx-tag {
+        display: inline-block;
+        padding: 1px 7px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 12px;
+        line-height: normal;
+      }
+      .jd-fx-pos {
+        color: #4f46e5;
+        background: #eef2ff;
+        border-color: #c7d2fe;
+      }
+      .jd-fx-ja {
+        color: #0e7490;
+        background: #ecfeff;
+        border-color: #a5f3fc;
+        font-weight: 600;
+      }
+      .jd-fx-aside {
+        font-size: 0.9em;
+        font-weight: 400;
+        opacity: 0.75;
+      }
+      .jd-fx-op {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .jd-fx-text {
+        font-size: 12px;
+        color: #374151;
       }
       .jd-g-ex {
         padding-left: 8px;
@@ -261,10 +330,14 @@
         fill: #888;
       }
       .jd-speak {
-        margin-left: auto;
-        align-self: center;
+        margin: 1px 0 0 auto;
+        flex-shrink: 0;
         display: inline-flex;
-        padding: 3px;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
         border: none;
         border-radius: 5px;
         background: transparent;
@@ -280,7 +353,8 @@
         cursor: default;
       }
       .jd-fav {
-        align-self: center;
+        margin-top: 1px;
+        flex-shrink: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -379,6 +453,8 @@
         border: 1px solid transparent;
         border-radius: 4px;
         white-space: nowrap;
+        background: transparent;
+        font-family: inherit;
       }
       .jd-nav-common {
         color: #15803d;
@@ -393,6 +469,13 @@
       .jd-nav-count {
         font-variant-numeric: tabular-nums;
         opacity: 0.8;
+      }
+      /* 可点的标签（结果区里列了这一类）：同 content.js 那份。 */
+      .jd-nav-link {
+        cursor: pointer;
+      }
+      .jd-nav-link:hover {
+        border-color: currentColor;
       }
       .footer {
         margin-top: 12px;
@@ -425,7 +508,8 @@
           background: #3a1f1e;
           color: #f3a39c;
         }
-        .jd-foot {
+        .jd-foot,
+        .jd-entry + .jd-entry {
           border-top-color: #333;
         }
         .search-box input {
@@ -485,6 +569,27 @@
         .jd-g-form-label,
         .jd-g-form-note {
           color: #999;
+        }
+        .jd-g-form-note,
+        .jd-g-formula {
+          background: #2a2a2a;
+        }
+        .jd-g-form-prose,
+        .jd-fx-text {
+          color: #c0c0c0;
+        }
+        .jd-fx-pos {
+          color: #8f94c9;
+          background: #262338;
+          border-color: #4a4770;
+        }
+        .jd-fx-ja {
+          color: #79a6ad;
+          background: #1f2b2e;
+          border-color: #3a545a;
+        }
+        .jd-fx-op {
+          color: #757575;
         }
         .jd-g-ex {
           border-left-color: #444;

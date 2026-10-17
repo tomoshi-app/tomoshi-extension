@@ -369,18 +369,23 @@
     .jd-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px; }
     .jd-foot { flex-shrink: 0; padding: 10px 14px 12px; border-top: 1px solid #eee; }
     .jd-foot > :first-child { margin-top: 0; }
+    /* 词头行：标题组换行时（词头＋读音＋音调图一行，JLPT／常用章折到第二行）发音 / 收藏
+       钮贴住第一行——词头行高定死 26px，两颗钮都是 24px 方块、顶对齐再下移 1px 居中。 */
     .jd-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
       margin-top: 12px;
     }
     .jd-head:first-child { margin-top: 0; }
+    /* 词条 / 语法卡之间的分隔线（shared.js entryWrap），颜色同 .jd-foot 上沿。 */
+    .jd-entry + .jd-entry { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+    .jd-deconj + .jd-entry { margin-top: 12px; }
     .jd-title {
       display: flex; align-items: center; flex-wrap: wrap;
       gap: 2px 8px; flex: 1; min-width: 0;
     }
-    .jd-surface { font-size: 18px; font-weight: 600; white-space: nowrap; }
+    .jd-surface { font-size: 18px; line-height: 26px; font-weight: 600; white-space: nowrap; }
     .jd-reading { font-size: 13px; color: #777; white-space: nowrap; }
     .jd-sense { margin: 3px 0 0 2px; color: #333; }
     .jd-pos { font-size: 12px; color: #888; }
@@ -388,14 +393,15 @@
     .jd-msg { color: #888; }
     .jd-deconj { font-size: 12px; color: #777; margin: 0 0 6px; padding: 4px 8px; background: #f3f3f3; border-radius: 6px; }
     .jd-speak {
-      margin-left: auto; align-self: center;
-      display: inline-flex; padding: 3px; border: none; border-radius: 5px;
+      margin: 1px 0 0 auto; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; padding: 0; border: none; border-radius: 5px;
       background: transparent; color: #999; cursor: pointer;
     }
     .jd-speak:hover { background: rgba(0, 0, 0, 0.06); color: #555; }
     .jd-speak-busy { opacity: 0.4; cursor: default; }
     .jd-fav {
-      align-self: center;
+      margin-top: 1px; flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
       width: 24px; height: 24px; padding: 0; border: none; border-radius: 5px;
       background: transparent; color: #b8b8b8; cursor: pointer;
@@ -426,10 +432,13 @@
     /* 结果分类导航（shared.js appendSectionNav）：同桌面 SearchBar .sug-nav——常用绿、
        语法青、非常用只灰字无框；色值取 app.css --color-tag-common-* / --color-tag-gram-*。 */
     .jd-nav { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; }
-    .jd-nav-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; font-size: 12px; line-height: 1.5; color: #9ca3af; border: 1px solid transparent; border-radius: 4px; white-space: nowrap; }
+    .jd-nav-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; font-size: 12px; line-height: 1.5; color: #9ca3af; border: 1px solid transparent; border-radius: 4px; white-space: nowrap; background: transparent; font-family: inherit; }
     .jd-nav-common { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
     .jd-nav-grammar { color: #0e7490; background: #ecfeff; border-color: #a5f3fc; }
     .jd-nav-count { font-variant-numeric: tabular-nums; opacity: 0.8; }
+    /* 可点的标签（结果区里列了这一类）：按钮外观同摘要标签，悬停描一圈本色边框。 */
+    .jd-nav-link { cursor: pointer; }
+    .jd-nav-link:hover { border-color: currentColor; }
     .jd-nav + .jd-more { margin-top: 8px; }
     .jd-more {
       display: block; width: 100%; margin-top: 12px; padding: 7px 10px;
@@ -450,10 +459,21 @@
     .jd-g-senses li + li { margin-top: 2px; }
     .jd-g-sec { margin: 8px 0 0 2px; }
     .jd-g-sec-title { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 2px; }
-    .jd-g-form { font-size: 13px; color: #333; }
-    .jd-g-form + .jd-g-form { margin-top: 2px; }
-    .jd-g-form-label { font-size: 12px; color: #888; margin-right: 6px; }
-    .jd-g-form-note { font-size: 12px; color: #888; margin-left: 2px; }
+    /* 接续（同桌面 GrammarCard .formation-*）：一行一条公式；带「＋」的拆成标签——
+       词性靛蓝（--color-tag-annot-*）、日语成分青（--color-tag-gram-*），连接符灰字。 */
+    .jd-g-form { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: 13px; line-height: 1.6; color: #333; }
+    .jd-g-form + .jd-g-form, .jd-g-form + .jd-g-form-prose, .jd-g-form-prose + .jd-g-form { margin-top: 4px; }
+    .jd-g-form-label { font-size: 12px; color: #888; }
+    .jd-g-form-note { font-size: 12px; color: #6b7280; padding: 0 6px; border-radius: 3px; background: #f3f4f6; }
+    .jd-g-form-prose { display: block; font-size: 13px; line-height: 1.6; color: #374151; }
+    .jd-g-formula { padding: 1px 8px; border-radius: 4px; background: #f3f4f6; font-weight: 600; }
+    .jd-g-fx { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 3px; }
+    .jd-fx-tag { display: inline-block; padding: 1px 7px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; line-height: normal; }
+    .jd-fx-pos { color: #4f46e5; background: #eef2ff; border-color: #c7d2fe; }
+    .jd-fx-ja { color: #0e7490; background: #ecfeff; border-color: #a5f3fc; font-weight: 600; }
+    .jd-fx-aside { font-size: 0.9em; font-weight: 400; opacity: 0.75; }
+    .jd-fx-op { font-size: 12px; color: #9ca3af; }
+    .jd-fx-text { font-size: 12px; color: #374151; }
     .jd-g-ex { padding-left: 8px; border-left: 2px solid #d6dae3; }
     .jd-g-ex-jp { font-size: 14px; color: #222; }
     .jd-g-ex-tr { font-size: 12px; color: #777; margin-top: 1px; }
@@ -475,7 +495,7 @@
     .jd-pitch-dot-low { fill: #888; }
     @media (prefers-color-scheme: dark) {
       .jd-box { background: #1f1f1f; color: #ededed; border-color: #333; }
-      .jd-foot { border-top-color: #333; }
+      .jd-foot, .jd-entry + .jd-entry { border-top-color: #333; }
       .jd-reading { color: #aaa; }
       .jd-sense { color: #cfcfcf; }
       .jd-pos { color: #999; }
@@ -489,6 +509,11 @@
       .jd-reg-formal { background: #991b1b; }
       .jd-g-meaning, .jd-g-senses, .jd-g-form { color: #cfcfcf; }
       .jd-g-sec-title, .jd-g-form-label, .jd-g-form-note { color: #999; }
+      .jd-g-form-note, .jd-g-formula { background: #2a2a2a; }
+      .jd-g-form-prose, .jd-fx-text { color: #c0c0c0; }
+      .jd-fx-pos { color: #8f94c9; background: #262338; border-color: #4a4770; }
+      .jd-fx-ja { color: #79a6ad; background: #1f2b2e; border-color: #3a545a; }
+      .jd-fx-op { color: #757575; }
       .jd-g-ex { border-left-color: #444; }
       .jd-g-ex-jp { color: #e5e5e5; }
       .jd-g-ex-tr { color: #aaa; }

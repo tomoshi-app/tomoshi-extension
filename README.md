@@ -25,7 +25,7 @@ Safari 版不走商店，随 macOS 桌面应用一并安装，在 Safari 的「�
 
 **改动本地 API 契约时**：只要扩展开始依赖旧版桌面应用没有的能力，就要同步抬高 `MIN_APP_VERSION`。商店会在数小时内静默推送新扩展，而桌面应用要等用户启动才更新——「新扩展 + 旧客户端」是发版后的常态而非边角情况。能力本身若可探测（如发音靠响应里 `audio` 是否非空判断旧客户端没播），优先按探测结果给精确提示，版本号只作通用兜底。
 
-**反方向（0.3.0 起）**：`/v1/health` 还回 `min_extension`——桌面应用期望的最低扩展版本（真源 `src-tauri/src/server/mod.rs` `MIN_EXTENSION_VERSION`，1.1.2 起下发；老应用没有该字段则不提示）。扩展与自己的 manifest 版本比，过旧时 popup 状态行提示、设置页按安装渠道给出处置：manifest 带 `key` 的是大陆离线 zip（`OFFLINE_INSTALL`），给 `tomoshi.cn/download/extension/` 的重新下载链接；商店安装只说等浏览器自动更新。离线 zip 永远不会自动更新，这是那批用户得知有新版的唯一途径。抬 `MIN_EXTENSION_VERSION` 的规矩见 `docs/release/extension-store-release.md`「大陆离线安装包」节。
+**反方向（0.3.0 起）**：`/v1/health` 还回 `min_extension`——桌面应用期望的最低扩展版本（真源 `src-tauri/src/server/mod.rs` `MIN_EXTENSION_VERSION`，1.1.2 起下发；老应用没有该字段则不提示）。扩展与自己的 manifest 版本比，过旧时 popup 状态行提示、设置页按安装渠道给出处置：manifest 带 `key` 的是大陆离线 zip（`OFFLINE_INSTALL`），给 `tomoshi.cn/download/extension/` 的重新下载链接；商店安装只说等浏览器自动更新。离线 zip 永远不会自动更新，这是那批用户得知有新版的唯一途径。**0.3.0 之前的离线版**不认 `min_extension`，改由 App 认出（2026-10-16）：本地 API 的 `/v1/lookup` 见到离线版 Origin 且 `limit` 不是 0.3.0 回落路径的 20（老扩展恒为 8）时，桌面 Shell 出一条可关闭的「重新下载扩展」横幅（`src-tauri/src/commands/extension.rs`）；故 `background.js` 的 `SEARCH_ENTRY_LIMIT` 与 App 侧 `SEARCH_FALLBACK_LOOKUP_LIMIT` 必须同值（单测钉住）。抬 `MIN_EXTENSION_VERSION` 的规矩见 `docs/release/extension-store-release.md`「大陆离线安装包」节。
 
 ## 加载（开发）
 

@@ -448,7 +448,8 @@
 
   // ── 语法卡（2026-10-15 改版）：桌面应用 GrammarCard.svelte 的精简版 ──────────────
   // 头部：句型 + 读音 + JLPT 章（同词条那枚）+ 语体章；正文：多义时编号列义项（v2 数据
-  // `senses`，单义 / 旧数据回落整段 `meaning`）→ 接续逐条分行（parseFormation）→
+  // `senses`，单义 / 旧数据回落整段 `meaning`）→ 接续逐条分行（parseFormation），
+  // 带「＋」的公式拆成词性 / 日语成分两色标签（splitFormula，2026-10-16 起同桌面）→
   // 第一个例句（日文一行、译文另起一行）。用法 / 注意 / 易混淆不搬，底部按钮进应用看全。
 
   // 接续段切分：src/lib/grammarText.ts splitTopLevel / formationSep / parseFormation 的
@@ -499,7 +500,8 @@
     return -1;
   }
 
-  /** → [{ label, formula, note }]：「口语缩略：…」这类前缀标签与句尾括注拆出来弱化显示。 */
+  /** → [{ label, formula, note, isFormula }]：「口语缩略：…」这类前缀标签与句尾括注拆出来弱化显示；
+   *  isFormula=false 的段（无 +/→ 且偏长）按一句说明渲染。 */
   function parseFormation(text) {
     return splitTopLevel(text.replace(/\r/g, ""), formationSep).map((seg) => {
       let f = seg.replace(/[。.]\s*$/, "").trim();
@@ -518,8 +520,279 @@
           f = f.slice(0, open).trim();
         }
       }
-      return { label, formula: f, note };
+      const isFormula = /[＋+→]/.test(f) || (f.length <= 30 && !/[，,]/.test(f));
+      return { label, formula: f, note, isFormula };
     });
+  }
+
+  // 接续标签化（2026-10-16）：grammarText.ts splitFormula / splitMixed / classifyPart / posToEn
+  // 的逐条移植——按顶层「＋」拆成标签，词性描述（靛蓝）｜日语成分（青）｜判不出的普通字。
+  // 改那边的标记表 / 词素表时这里一起改。
+  const POS_MARK =
+    /[A-Za-z词詞形干幹句语語项項]|用言|表达|表達|表現|内容|內容|否定|部分|场所|場所|地点|地點|引用|引号|引號|发言|發言|连体|連体|简体|簡體|结论|結論|评价|評價|评论|評論|说明|說明|接续|接續|同上|人名|数量|數量|长度|長度|[前後]件|補足|話題|主題|者$|^[文節]$/;
+  const KANA = /[ぁ-ゟ゠-ヿ]/;
+  const CJK = /[㐀-鿿]/;
+
+  function classifyPart(core) {
+    const bare = core.replace(/^「(.*)」$/, "$1");
+    if (POS_MARK.test(bare)) return "pos";
+    if (KANA.test(bare) || CJK.test(bare)) return "ja";
+    return "text";
+  }
+
+  const ALT_SEP = /[、／/]/;
+
+  // 一个「＋」片段按顶层并列分隔再切成多枚标签；跨种类的「、」保留为连接符。
+  function splitMixed(core) {
+    const out = [];
+    if (/[，,]/.test(core)) return [{ text: core, kind: classifyPart(core), sep: "" }];
+    let depth = 0;
+    let start = 0;
+    let pending = "";
+    const push = (end, sep) => {
+      const text = pending + core.slice(start, end).trim();
+      pending = "";
+      if (!text) {
+        const prev = out[out.length - 1];
+        if (prev) prev.sep += sep;
+        else pending = sep;
+        return;
+      }
+      out.push({ text, kind: classifyPart(text), sep });
+    };
+    for (let i = 0; i < core.length; i++) {
+      const ch = core[i];
+      if (F_OPEN.has(ch)) depth++;
+      else if (F_CLOSE.has(ch)) depth = Math.max(0, depth - 1);
+      else if (depth === 0 && ALT_SEP.test(ch)) {
+        push(i, ch);
+        start = i + 1;
+      }
+    }
+    push(core.length, "");
+    const tail = out[out.length - 1];
+    if (tail && tail.sep) {
+      tail.text += tail.sep;
+      tail.sep = "";
+    }
+    for (let i = 0; i < out.length - 1; i++) {
+      out[i].sep = out[i].sep === "、" && out[i].kind !== out[i + 1].kind ? "、" : "";
+    }
+    return out;
+  }
+
+  /** → [{ text, kind, aside, joiner }]；公式里没有顶层加号时返回 null（整块原样显示）。 */
+  function splitFormula(formula, en) {
+    const parts = splitTopLevel(formula, (s, i) => (s[i] === "＋" || s[i] === "+" ? 1 : 0));
+    if (parts.length < 2) return null;
+    const out = [];
+    parts.forEach((p, pi) => {
+      let core = p;
+      let aside = "";
+      const last = p[p.length - 1];
+      if (last === "）" || last === ")") {
+        const open = matchingOpen(p, p.length - 1);
+        if (open > 0) {
+          core = p.slice(0, open).trim();
+          aside = p.slice(open + 1, -1).trim();
+        }
+      }
+      const subs = splitMixed(core);
+      if (subs.length === 0) subs.push({ text: core, kind: classifyPart(core), sep: "" });
+      subs.forEach((s, si) => {
+        const lastSub = si === subs.length - 1;
+        out.push({
+          text: s.text,
+          kind: s.kind,
+          aside: lastSub ? aside : "",
+          joiner: lastSub ? (pi < parts.length - 1 ? "＋" : "") : s.sep,
+        });
+      });
+    });
+    if (!en) return out;
+    // 英文数据的接续写的是日文词性术语，英文里读着像串了语言——词性标签显示层译成英文。
+    return out.map((t) =>
+      t.kind === "pos"
+        ? { ...t, text: posToEn(t.text) || t.text, aside: (t.aside && posToEn(t.aside)) || t.aside }
+        : t
+    );
+  }
+
+  // 日文词性术语 → 英文：切成已知词素（最长匹配），有一个字切不进就整段返回 null。
+  const POS_CLASS = {
+    名詞: "Noun",
+    代名詞: "Pronoun",
+    指示代名詞: "Demonstrative",
+    指示詞: "Demonstrative",
+    場所名詞: "Place noun",
+    サ変名詞: "Suru-noun",
+    動作性名詞: "Action noun",
+    動詞: "Verb",
+    他動詞: "Transitive verb",
+    自動詞: "Intransitive verb",
+    移動動詞: "Motion verb",
+    五段動詞: "Godan verb",
+    一段動詞: "Ichidan verb",
+    可能動詞: "Potential verb",
+    受身動詞: "Passive verb",
+    使役動詞: "Causative verb",
+    サ変動詞: "Suru-verb",
+    い形容詞: "i-adj.",
+    イ形容詞: "i-adj.",
+    な形容詞: "na-adj.",
+    ナ形容詞: "na-adj.",
+    形容動詞: "na-adj.",
+    形容詞: "Adjective",
+    副詞: "Adverb",
+    数量詞: "Quantity",
+    数量: "Quantity",
+    数詞: "Number",
+    助数詞: "Counter",
+    疑問詞: "Question word",
+    格助詞: "Case particle",
+    助詞: "Particle",
+    述語: "Predicate",
+    主語: "Subject",
+    節: "Clause",
+    文: "Sentence",
+    動詞句: "Verb phrase",
+    場所: "Place",
+    引用文: "Quotation",
+    連体修飾語: "Noun modifier",
+    連体修飾節: "Relative clause",
+    連体修飾: "Noun modifier",
+    否定表現: "Negative expression",
+    否定述語: "Negative predicate",
+    否定: "Negation",
+    後件: "Main clause",
+  };
+  const POS_FORM = {
+    辞書形: "dictionary form",
+    普通形: "plain form",
+    丁寧形: "polite form",
+    て形: "te-form",
+    ない形: "nai-form",
+    た形: "ta-form",
+    ます形: "masu-form",
+    ます形語幹: "masu-stem",
+    ます形の語幹: "masu-stem",
+    語幹: "stem",
+    意向形: "volitional form",
+    意志形: "volitional form",
+    連用形: "continuative form",
+    連体形: "attributive form",
+    未然形: "irrealis form",
+    仮定形: "conditional form",
+    否定形: "negative form",
+    可能形: "potential form",
+    受身形: "passive form",
+    命令形: "imperative form",
+    過去形: "past form",
+    現在形: "present form",
+    ば形: "ba-form",
+    たら形: "tara-form",
+    たい形: "tai-form",
+    ている形: "teiru-form",
+    ていた形: "teita-form",
+    く形: "ku-form",
+    くて形: "kute-form",
+    ければ形: "kereba-form",
+  };
+  const STEM_FORMS = new Set(["stem", "masu-stem"]);
+  const POS_LEXEMES = [
+    ...Object.keys(POS_CLASS).map((k) => ({ k, cls: POS_CLASS[k] })),
+    ...Object.keys(POS_FORM).map((k) => ({ k, form: POS_FORM[k] })),
+  ].sort((a, b) => b.k.length - a.k.length);
+
+  function posToEn(text) {
+    const s = text.replace(/^「(.*)」$/, "$1").trim();
+    const wrapped = /^[（(](.+)[）)]$/.exec(s);
+    if (wrapped) {
+      const inner = posToEn(wrapped[1]);
+      return inner && `(${inner})`;
+    }
+    const paren = /^(.+?)[（(](.+)[）)]$/.exec(s);
+    if (paren) {
+      const head = posToEn(paren[1]);
+      const note = posToEn(paren[2]);
+      return head && note ? `${head} (${note[0].toLowerCase() + note.slice(1)})` : null;
+    }
+    const groups = [];
+    let cur = { classes: [], forms: [] };
+    let afterNo = false;
+    let suffix = "";
+    let i = 0;
+    while (i < s.length) {
+      const ch = s[i];
+      if (ch === " " || ch === "　" || ch === "・" || ch === "/" || ch === "／") {
+        i++;
+        continue;
+      }
+      if (/[₀-₉]/.test(ch) && cur.classes.length > 0 && !afterNo) {
+        cur.classes[cur.classes.length - 1] += ch;
+        i++;
+        continue;
+      }
+      if (ch === "の" && cur.classes.length > 0 && cur.forms.length === 0 && !afterNo) {
+        afterNo = true;
+        i++;
+        continue;
+      }
+      const lx = POS_LEXEMES.find((l) => s.startsWith(l.k, i));
+      if (!lx) {
+        const rest = s.slice(i).trim();
+        if (!afterNo && cur.classes.length > 0 && /^[〜～…ぁ-ゟ゠-ヿ]+$/.test(rest)) {
+          suffix = rest;
+          break;
+        }
+        return null;
+      }
+      if (afterNo && !lx.form) return null;
+      afterNo = false;
+      if (lx.cls) {
+        if (cur.forms.length > 0) {
+          groups.push(cur);
+          cur = { classes: [], forms: [] };
+        }
+        cur.classes.push(lx.cls);
+      } else cur.forms.push(lx.form);
+      i += lx.k.length;
+    }
+    if (afterNo) return null;
+    groups.push(cur);
+    if (groups.every((g) => g.classes.length === 0 && g.forms.length === 0)) return null;
+    const out =
+      groups
+        .map((g) => {
+          const cls = g.classes.join(" / ");
+          if (!cls) return g.forms.join(" / ");
+          if (g.forms.length === 0) return cls;
+          if (g.forms.every((f) => STEM_FORMS.has(f))) return `${cls} ${g.forms.join(" / ")}`;
+          return `${cls} (${g.forms.join(" / ")})`;
+        })
+        .join(" / ") + (suffix ? ` ${suffix}` : "");
+    return /^[a-z]/.test(out) && !/^(?:i|na)-adj\./.test(out)
+      ? out[0].toUpperCase() + out.slice(1)
+      : out;
+  }
+
+  // 括号随文字选半角 / 全角（桌面 GrammarCard 的 paren 同规）。
+  const isAscii = (s) => /^[\x20-\x7e]+$/.test(s);
+  const parenText = (s) => (isAscii(s[0]) ? ` (${s})` : `（${s}）`);
+
+  // 扩展拿不到桌面的 dict_locale：语法文本随词典语言走，按释义里拉丁字母多于汉字判英文数据。
+  function isEnGrammar(g) {
+    const s = g.meaning || ((g.senses || [])[0] || {}).gloss || "";
+    const latin = (s.match(/[A-Za-z]/g) || []).length;
+    const han = (s.match(/[㐀-鿿]/g) || []).length;
+    return latin > han;
+  }
+
+  function span(cls, text) {
+    const el = document.createElement("span");
+    el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
   }
 
   // 语体：数据值恒为简体四档（同桌面 RegisterTag），显示文案走 i18n，类名用固定英文键。
@@ -586,23 +859,37 @@
     const forms = g.formation ? parseFormation(g.formation) : [];
     if (forms.length) {
       const sec = grammarSection("grammar.formationTitle");
+      const en = isEnGrammar(g);
       for (const it of forms) {
+        // 不像公式的段拼回一句说明（同桌面 proseLine）。
+        if (!it.isFormula) {
+          const p = span("jd-g-form-prose");
+          const label = it.label ? it.label + (isAscii(it.label) ? ": " : "：") : "";
+          p.textContent = label + it.formula + (it.note ? parenText(it.note) : "");
+          sec.appendChild(p);
+          continue;
+        }
         const row = document.createElement("div");
         row.className = "jd-g-form";
-        if (it.label) {
-          const l = document.createElement("span");
-          l.className = "jd-g-form-label";
-          l.textContent = it.label;
-          row.appendChild(l);
+        if (it.label) row.appendChild(span("jd-g-form-label", it.label));
+        const tokens = splitFormula(it.formula, en);
+        if (tokens) {
+          const wrap = span("jd-g-fx");
+          for (const tk of tokens) {
+            const tag = span(tk.kind === "text" ? "jd-fx-text" : `jd-fx-tag jd-fx-${tk.kind}`);
+            // 日语成分走日文字形；括注多是中文说明，留在 lang 之外。
+            const body = span("", tk.text);
+            if (tk.kind === "ja") body.lang = "ja";
+            tag.appendChild(body);
+            if (tk.aside) tag.appendChild(span("jd-fx-aside", parenText(tk.aside)));
+            wrap.appendChild(tag);
+            if (tk.joiner) wrap.appendChild(span("jd-fx-op", tk.joiner));
+          }
+          row.appendChild(wrap);
+        } else {
+          row.appendChild(span("jd-g-formula", it.formula));
         }
-        row.appendChild(document.createTextNode(it.formula));
-        if (it.note) {
-          const n = document.createElement("span");
-          n.className = "jd-g-form-note";
-          // 括号随文字选半角 / 全角（桌面 GrammarCard 的 paren 同规）。
-          n.textContent = /^[\x20-\x7e]/.test(it.note) ? `(${it.note})` : `（${it.note}）`;
-          row.appendChild(n);
-        }
+        if (it.note) row.appendChild(span("jd-g-form-note", it.note));
         sec.appendChild(row);
       }
       box.appendChild(sec);
@@ -673,19 +960,29 @@
   // 查询结果里的 `sections`（App 的 /v1/search 算好下发；老 App 由 background.js 用老端点
   // 拼出同样的数），上限与应用结果页相同（词条 20 / 语法 30），数字对得上应用里看到的。
   // 浮层只列前几条，导航让人知道「还有多少」（として 有 7 条语法，浮层只列 3 条）。
-  // 只是摘要、不可点：浮层要按住触发键才能交互，跳转统一走下面那颗按钮。
+  // 可点（2026-10-16）：浮层里列了这一类的卡片时，点标签把结果区滚到该类第一张的顶部；
+  // 这一类有计数却一张没列（词条名额被常用词占满）时仍是不可点的摘要。
   // 出现条件同 suggest 的 showNav：至少两类有结果，或某一类多于浮层列出的条数。
   const NAV_SECTIONS = ["common", "grammar", "uncommon"];
 
-  function appendSectionNav(box, counts, overflowing) {
+  function appendSectionNav(box, counts, overflowing, scroll) {
     const present = NAV_SECTIONS.filter((id) => counts[id] > 0);
     if (!present.length || (present.length < 2 && !overflowing)) return;
     const nav = document.createElement("div");
     nav.className = "jd-nav";
     nav.setAttribute("aria-label", T("nav.label"));
     for (const id of present) {
-      const chip = document.createElement("span");
-      chip.className = `jd-nav-chip jd-nav-${id}`;
+      const target = scroll && scroll.querySelector(`[data-jd-section="${id}"]`);
+      const chip = document.createElement(target ? "button" : "span");
+      chip.className = `jd-nav-chip jd-nav-${id}` + (target ? " jd-nav-link" : "");
+      if (target) {
+        chip.type = "button";
+        chip.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          scrollToSection(scroll, target);
+        });
+      }
       chip.textContent = T(`nav.${id}`);
       const n = document.createElement("span");
       n.className = "jd-nav-count";
@@ -696,8 +993,33 @@
     box.appendChild(nav);
   }
 
-  function renderEntries(box, q, entries, pitchFn, ttsFn, fav) {
+  // 把 target 的上沿对到滚动区内容区顶部（扣掉 .jd-scroll 的上内边距：页面浮层那份有
+  // 12px，工具栏弹窗那份没有）。
+  function scrollToSection(scroll, target) {
+    const pad = parseFloat(getComputedStyle(scroll).paddingTop) || 0;
+    const top =
+      scroll.scrollTop +
+      target.getBoundingClientRect().top -
+      scroll.getBoundingClientRect().top -
+      pad;
+    scroll.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }
+
+  // 每个词条 / 语法卡各包一层 .jd-entry，相邻两张之间由样式画一条分隔线（2026-10-16）。
+  // `section`：给该段第一张打上 data-jd-section，分类导航据此跳转。
+  function entryWrap(box, section) {
+    const wrap = document.createElement("div");
+    wrap.className = "jd-entry";
+    if (section && !box.querySelector(`[data-jd-section="${section}"]`)) {
+      wrap.dataset.jdSection = section;
+    }
+    box.appendChild(wrap);
+    return wrap;
+  }
+
+  function renderEntries(scroll, q, entries, pitchFn, ttsFn, fav, section) {
     for (const entry of entries) {
+      const box = entryWrap(scroll, section);
       const hw = headword(entry, q);
       const { surface, reading } = hw;
       const head = document.createElement("div");
@@ -835,7 +1157,7 @@
     }
     return kept.reverse().map(stepName).filter(Boolean).join(" → ");
   }
-  // `res` 是 background.js search() 的回包：{ ok, entries, grammar, sections, deconj }
+  // `res` 是 background.js search() 的回包：{ ok, entries, grammar, sections, common, deconj }
   // ——一次查询全部到齐（App 1.1.2 起的 /v1/search；老 App 由 background 用老端点拼出同样
   // 形状），这里同步渲染，不再有「未找到单词，查询语法…」的中间态。
   //
@@ -884,16 +1206,27 @@
     // 非常用词。查 をめぐって 时，罕用的同形词条排在它的语法点后面，而不是独占首屏、
     // 语法只剩一个计数。段内保持 App 给的相关度顺序；词条两段合计 WORDS_SHOWN 条，
     // 常用的先占位。
-    const common = entries.filter((e) => e.is_common).slice(0, WORDS_SHOWN);
-    const uncommon = entries.filter((e) => !e.is_common).slice(0, WORDS_SHOWN - common.length);
+    // 常用与否按命中的写法（App 回的 `common`，与 entries 等长）：てい 只命中 弟 的次要读音，
+    // 弟 沉到非常用段，不再凭 おとうと 的常用标记排在最前。老 App 不回 → 词条级 is_common。
+    const flags =
+      Array.isArray(res.common) && res.common.length === entries.length ? res.common : null;
+    const isHitCommon = (e, i) => (flags ? flags[i] : e.is_common);
+    const common = entries.filter(isHitCommon).slice(0, WORDS_SHOWN);
+    const uncommon = entries
+      .filter((e, i) => !isHitCommon(e, i))
+      .slice(0, WORDS_SHOWN - common.length);
     const shownGrammar = grammar.slice(0, GRAMMAR_SHOWN);
-    renderEntries(scroll, q, common, pitchFn, ttsFn, fav);
-    shownGrammar.forEach((g) => renderGrammarCard(scroll, g));
-    renderEntries(scroll, q, uncommon, pitchFn, ttsFn, fav);
+    // 词头回显按还原后的辞书形挑写法：选中 聴いて 时原文对不上任何写法，会回落到首个
+    // 汉字写法 聞く，与上面那句「…是「聴く」的て形」对不上。
+    const headQ = (res.deconj && res.deconj.base) || q;
+    renderEntries(scroll, headQ, common, pitchFn, ttsFn, fav, "common");
+    shownGrammar.forEach((g) => renderGrammarCard(entryWrap(scroll, "grammar"), g));
+    renderEntries(scroll, headQ, uncommon, pitchFn, ttsFn, fav, "uncommon");
     appendSectionNav(
       foot,
       res.sections || {},
-      common.length + uncommon.length < entries.length || shownGrammar.length < grammar.length
+      common.length + uncommon.length < entries.length || shownGrammar.length < grammar.length,
+      scroll
     );
     // 有任何结果都叫「查看详情」：应用里的搜索会落到同一批词条 / 语法卡（语法卡在应用
     // 里还有用法、注意与易混淆）。
